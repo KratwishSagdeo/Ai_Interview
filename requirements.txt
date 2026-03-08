@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+faster-whisper
+torch
+torchaudio
+webrtcvad
+transformers
+spacy
+language-tool-python
+numpy
+scikit-learn
+xgboost
+request
