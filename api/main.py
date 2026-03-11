@@ -1,19 +1,26 @@
-from fastapi import FastAPI
-import numpy as np
+from fastapi import FastAPI, UploadFile, File
+import tempfile
 
-from pipelines.evaluation_pipeline import SpeechEvaluationPipeline
+from Ai_Interview.pipelines.evaluation_pipeline import SpeechEvaluationPipeline
 
 app = FastAPI()
 
 pipeline = SpeechEvaluationPipeline()
 
 
+@app.get("/")
+def home():
+    return {"message": "AI Interview Evaluation API running"}
+
+
 @app.post("/evaluate")
+async def evaluate(audio: UploadFile = File(...)):
 
-async def evaluate(audio: list):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        contents = await audio.read()
+        tmp.write(contents)
+        temp_audio_path = tmp.name
 
-    audio_np = np.array(audio, dtype=np.float32)
-
-    result = pipeline.evaluate(audio_np)
+    result = pipeline.evaluate(temp_audio_path)
 
     return result

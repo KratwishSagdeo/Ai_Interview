@@ -1,6 +1,5 @@
 import requests
-from configs.config import LANGUAGETOOL_URL
-
+from Ai_Interview.configs.config import LANGUAGETOOL_URL
 class GrammarAnalyzer:
 
     def analyze(self, text):

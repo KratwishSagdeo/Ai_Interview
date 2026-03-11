@@ -1,15 +1,15 @@
 from faster_whisper import WhisperModel
 import numpy as np
-from configs.config import WHISPER_MODEL
+from Ai_Interview.configs.config import WHISPER_MODEL
 
 class WhisperStreamer:
 
     def __init__(self):
 
-        self.model = WhisperModel(
-            WHISPER_MODEL,
-            device="cuda",
-            compute_type="float16"
+       self.model = WhisperModel(
+            "base",
+            device="cpu",
+            compute_type="int8"
         )
 
     def transcribe(self, audio):

@@ -1,21 +1,15 @@
 from transformers import pipeline
 
 class DisfluencyDetector:
-
     def __init__(self):
-
         self.model = pipeline(
             "token-classification",
-            model="philschmid/bert-base-cased-finetuned-disfluency",
-            aggregation_strategy="simple"
+            model="elastic/distilbert-base-cased-finetuned-conll03-english"
         )
 
     def detect(self, text):
-
         results = self.model(text)
-
-        fillers = 0
-        repetitions = 0
+        return results
 
         for r in results:
 

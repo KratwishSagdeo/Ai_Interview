@@ -1,12 +1,12 @@
 import pickle
+import os
 
-from asr.whisper_stream import WhisperStreamer
-from audio.vad import PauseDetector
-from nlp.disfluency_detector import DisfluencyDetector
-from nlp.grammar import GrammarAnalyzer
-from nlp.lexical import LexicalAnalyzer
-
-from configs.config import FLUENCY_MODEL_PATH
+from Ai_Interview.asr.whisper_stream import WhisperStreamer
+from Ai_Interview.audio.vad import PauseDetector
+from Ai_Interview.nlp.disfluency_detector import DisfluencyDetector
+from Ai_Interview.nlp.grammar import GrammarAnalyzer
+from Ai_Interview.nlp.lexical import LexicalAnalyzer
+from Ai_Interview.configs.config import FLUENCY_MODEL_PATH
 
 
 class SpeechEvaluationPipeline:
@@ -17,35 +17,57 @@ class SpeechEvaluationPipeline:
         self.pause_detector = PauseDetector()
         self.disfluency = DisfluencyDetector()
         self.grammar = GrammarAnalyzer()
-        self.lexical = LexicalAnalyzer()
+        self.lexical_analyzer = LexicalAnalyzer()
 
-        with open(FLUENCY_MODEL_PATH, "rb") as f:
-            self.fluency_model = pickle.load(f)
+        # Load fluency model safely
+        self.fluency_model = None
+
+        if os.path.exists(FLUENCY_MODEL_PATH):
+            with open(FLUENCY_MODEL_PATH, "rb") as f:
+                self.fluency_model = pickle.load(f)
 
     def evaluate(self, audio):
 
+        # Speech to text
         text, timestamps = self.asr.transcribe(audio)
 
+        # NLP analysis
         disfluency = self.disfluency.detect(text)
-
         grammar_errors = self.grammar.analyze(text)
-
-        lexical = self.lexical.analyze(text)
+        lexical_results = self.lexical_analyzer.analyze(text)
 
         pauses = len(timestamps)
 
-        speech_rate = lexical["word_count"] / (timestamps[-1][1] / 60)
+        # Avoid division by zero
+        duration_minutes = timestamps[-1][1] / 60 if timestamps else 1
+
+        speech_rate = lexical_results["word_count"] / duration_minutes
 
         features = [[
             speech_rate,
             pauses,
             disfluency["fillers"],
             grammar_errors,
-            lexical["type_token_ratio"],
-            lexical["sentence_complexity"]
+            lexical_results["type_token_ratio"],
+            lexical_results["sentence_complexity"]
         ]]
 
-        score = self.fluency_model.predict(features)[0]
+        # If ML model exists → use it
+        if self.fluency_model:
+            score = self.fluency_model.predict(features)[0]
+
+        # Otherwise fallback rule-based scoring
+        else:
+            score = max(
+                0,
+                min(
+                    100,
+                    70
+                    - disfluency["fillers"] * 2
+                    - grammar_errors * 2
+                    + lexical_results["type_token_ratio"] * 10
+                )
+            )
 
         return {
 
@@ -61,5 +83,5 @@ class SpeechEvaluationPipeline:
 
             "grammar_errors": grammar_errors,
 
-            "lexical_diversity": lexical["type_token_ratio"]
+            "lexical_diversity": lexical_results["type_token_ratio"]
         }
