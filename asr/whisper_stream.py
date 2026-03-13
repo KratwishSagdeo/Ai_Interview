@@ -6,43 +6,46 @@ class WhisperStreamer:
 
     def __init__(self):
 
-        # Load whisper model
-        # "base" model is fast and good for MVP
-        self.model = WhisperModel("base", device="cpu")
+        # Load whisper model optimized for CPU
+        self.model = WhisperModel(
+            "base",
+            device="cpu",
+            compute_type="int8",
+            cpu_threads=4
+        )
+
+        print("Whisper model loaded (CPU optimized)")
 
 
     def transcribe(self, audio_path):
 
-        # Run speech recognition on audio file
+        # Run speech recognition
         segments, info = self.model.transcribe(
             audio_path,
-            beam_size=5
+            beam_size=3,
+            vad_filter=True,
+            vad_parameters=dict(
+                min_silence_duration_ms=2500
+            )
         )
 
-        transcript = ""
-
+        transcript_parts = []
         timestamps = []
 
-        # Loop through each detected speech segment
         for segment in segments:
 
-            # FILTER 1 — Ignore low confidence speech
-            # avg_logprob measures confidence of transcription
-            if segment.avg_logprob < -1.0:
+            # Skip low confidence segments
+            if segment.avg_logprob < -1.5:
                 continue
 
-            # FILTER 2 — Ignore extremely short segments
             if len(segment.text.strip()) < 2:
                 continue
 
-            # Append clean text
-            transcript += segment.text + " "
-
-            # Save timestamp for pause detection
+            transcript_parts.append(segment.text.strip())
             timestamps.append((segment.start, segment.end))
 
+        transcript = " ".join(transcript_parts)
 
-        # Remove extra spaces
-        transcript = transcript.strip()
+        print("Transcript:", transcript)
 
         return transcript, timestamps
