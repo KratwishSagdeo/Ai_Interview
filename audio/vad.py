@@ -42,11 +42,15 @@ class PauseDetector:
             frame = wf.readframes(frame_size)
 
             # Stop when audio ends
-            if len(frame) == 0:
+            if len(frame) < frame_size * 2:
                 break
 
-            # Detect if frame contains speech
-            is_speech = self.vad.is_speech(frame, sample_rate)
+            try:
+                # Detect if frame contains speech
+                is_speech = self.vad.is_speech(frame, sample_rate)
+            except Exception:
+                # Skip invalid frames instead of crashing
+                continue
 
             if not is_speech:
 
@@ -71,9 +75,9 @@ class PauseDetector:
         if silence_duration_ms >= 2500:
             pauses += 1
 
-
         # Debug output
         print("Detected pauses:", pauses)
 
         # Return number of pauses
+        wf.close()
         return pauses

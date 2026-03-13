@@ -1,6 +1,7 @@
 # Import the FastAPI framework which is used to build APIs in Python
 from fastapi import FastAPI, UploadFile, File
 import os
+import subprocess
 
 # Import the tempfile module which allows us to create temporary files safely
 import tempfile
@@ -51,11 +52,31 @@ async def evaluate(audio: UploadFile = File(...)):
         # Save the temporary file path so we can pass it to the evaluation pipeline
         temp_audio_path = tmp.name
 
+    wav_path = temp_audio_path + ".wav"
+
     try:
+
+        # Convert uploaded file to 16kHz mono WAV using ffmpeg
+        conversion = subprocess.run(
+            [
+                r"C:\ffmpeg\bin\ffmpeg.exe",
+                "-y",
+                "-i", temp_audio_path,
+                "-ar", "16000",
+                "-ac", "1",
+                wav_path
+            ],
+            capture_output=True,
+            text=True
+        )
+
+        # If conversion fails return error
+        if conversion.returncode != 0:
+            return {"error": conversion.stderr}
 
         # Call the evaluation pipeline and pass the path of the saved audio file
         # The pipeline will process the audio and compute speech metrics
-        result = pipeline.evaluate(temp_audio_path)
+        result = pipeline.evaluate(wav_path)
 
         # Return the evaluation results as a JSON response
         # FastAPI automatically converts Python dictionaries to JSON
@@ -75,38 +96,5 @@ async def evaluate(audio: UploadFile = File(...)):
         if os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
 
-
-
-# ---------------------------------------------------------
-# End of File Explanation
-# ---------------------------------------------------------
-
-# This file is responsible for exposing your speech evaluation system as a REST API.
-
-# Main responsibilities of this file:
-# 1. Start a FastAPI server
-# 2. Accept audio file uploads from users
-# 3. Temporarily save uploaded audio files
-# 4. Pass the audio file to the SpeechEvaluationPipeline
-# 5. Return the computed evaluation results as JSON
-
-# This file DOES NOT contain the evaluation logic itself.
-# The actual speech processing happens inside:
-# pipelines/evaluation_pipeline.py
-
-# Typical request flow:
-# User → POST /evaluate with audio file → FastAPI
-# FastAPI → saves file → calls SpeechEvaluationPipeline
-# Pipeline → processes audio → returns metrics
-# FastAPI → sends JSON response back to the user
-
-# Example API response:
-# {
-#   "transcript": "Hello my name is Aryan...",
-#   "fluency_score": 82,
-#   "speech_rate": 135,
-#   "pause_count": 4,
-#   "filler_count": 2,
-#   "grammar_errors": 1,
-#   "lexical_diversity": 0.64
-# }
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
