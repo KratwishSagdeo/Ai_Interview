@@ -131,10 +131,23 @@ for speaker in os.listdir(AUDIO_ROOT):
             # This returns speech analysis results
             result = pipeline.evaluate(audio_path)
 
+            # Check if transcript is empty
+            # Empty transcripts can break speech feature calculations
+            if result["transcript"] == "":
+                continue
+
 
             # ----------------------------------------------------
             # Build dataset row
             # ----------------------------------------------------
+
+            # Safely extract fluency score from label dictionary
+            # This prevents crashes if JSON structure is slightly different
+            fluency_score = scores[audio_id].get("fluency", None)
+
+            # Skip sample if fluency score is missing
+            if fluency_score is None:
+                continue
 
             # Create a dictionary containing training features
             row = {
@@ -155,7 +168,7 @@ for speaker in os.listdir(AUDIO_ROOT):
                 "lexical_diversity": result["lexical_diversity"],
 
                 # Ground truth fluency score from dataset
-                "fluency_score": scores[audio_id]["fluency"]
+                "fluency_score": fluency_score
             }
 
 
@@ -185,9 +198,12 @@ dataset = pd.DataFrame(rows)
 # Save dataset to CSV file
 # ----------------------------------------------------
 
+# Build output file path inside training directory
+output_file = os.path.join(os.path.dirname(__file__), "training_dataset.csv")
+
 # Save the dataset as a CSV file
 # index=False prevents pandas from adding an extra index column
-dataset.to_csv("training_dataset.csv", index=False)
+dataset.to_csv(output_file, index=False)
 
 
 # ----------------------------------------------------
