@@ -1,9 +1,24 @@
+# ----------------------------------------------------
+# Load environment variables
+# ----------------------------------------------------
+
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, UploadFile, File
+
+# ----------------------------------------------------
+# Import required libraries
+# ----------------------------------------------------
+
+from fastapi import FastAPI, UploadFile, File, Form
 import shutil
 import os
+import uuid
+
+
+# ----------------------------------------------------
+# Import AI modules
+# ----------------------------------------------------
 
 from interview_engine.interview_manager import InterviewManager
 from pipelines.evaluation_pipeline import SpeechEvaluationPipeline
@@ -17,64 +32,128 @@ app = FastAPI()
 
 
 # ----------------------------------------------------
-# Initialize AI systems
+# Initialize global systems
 # ----------------------------------------------------
 
-interview_manager = InterviewManager()
+# Speech pipeline (shared)
 speech_pipeline = SpeechEvaluationPipeline()
 
-
-# Store current interview session
-current_question = None
+# Dictionary to store multiple interview sessions
+sessions = {}
 
 
 # ----------------------------------------------------
-# Upload Resume Endpoint
+# Upload Resume Endpoint (START INTERVIEW)
 # ----------------------------------------------------
 
 @app.post("/upload-resume")
-
 async def upload_resume(file: UploadFile = File(...)):
 
-    # Save uploaded resume
-    path = f"temp_{file.filename}"
+    try:
 
-    with open(path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        # Save uploaded resume file
+        path = f"temp_{file.filename}"
 
-    # Start interview
-    question = interview_manager.start_interview(path)
+        with open(path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    global current_question
-    current_question = question
 
-    return {"question": question}
+        # Create a unique session ID for this candidate
+        session_id = str(uuid.uuid4())
+
+
+        # Create a new interview manager instance
+        manager = InterviewManager()
+
+
+        # Start interview and get first question
+        question = manager.start_interview(path)
+
+
+        # Store session
+        sessions[session_id] = manager
+
+
+        # Return session ID + first question
+        return {
+            "session_id": session_id,
+            "question": question
+        }
+
+    except Exception as e:
+
+        return {"error": str(e)}
 
 
 # ----------------------------------------------------
-# Submit Audio Answer
+# Submit Audio Answer Endpoint
 # ----------------------------------------------------
 
 @app.post("/submit-answer")
+async def submit_answer(
+    session_id: str = Form(...),   # session ID required
+    file: UploadFile = File(...)
+):
 
-async def submit_answer(file: UploadFile = File(...)):
+    try:
 
-    # Save audio answer
-    path = f"temp_{file.filename}"
+        # ----------------------------------------------------
+        # Validate session
+        # ----------------------------------------------------
 
-    with open(path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        if session_id not in sessions:
+            return {"error": "Invalid session_id"}
 
-    # Run speech evaluation
-    result = speech_pipeline.evaluate(path)
 
-    transcript = result["transcript"]
+        # Get interview manager for this session
+        manager = sessions[session_id]
 
-    # Send transcript to interview manager
-    next_question = interview_manager.process_answer(transcript)
 
-    return {
-        "transcript": transcript,
-        "fluency_score": result["fluency_score"],
-        "next_question": next_question
-    }
+        # ----------------------------------------------------
+        # Validate file type (audio only)
+        # ----------------------------------------------------
+
+        if not file.filename.endswith((".wav", ".mp3", ".flac", ".ogg")):
+            return {"error": "Only audio files (.wav, .mp3, .flac, .ogg) are allowed"}
+
+
+        # ----------------------------------------------------
+        # Save uploaded audio
+        # ----------------------------------------------------
+
+        path = f"temp_{file.filename}"
+
+        with open(path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+
+        # ----------------------------------------------------
+        # Run speech evaluation
+        # ----------------------------------------------------
+
+        result = speech_pipeline.evaluate(path)
+
+        transcript = result.get("transcript", "")
+
+
+        # ----------------------------------------------------
+        # Process interview logic
+        # ----------------------------------------------------
+
+        next_question = manager.process_answer(transcript)
+
+
+        # ----------------------------------------------------
+        # Return response
+        # ----------------------------------------------------
+
+        return {
+            "transcript": transcript,
+            "fluency_score": result.get("fluency_score", 0),
+            "next_question": next_question
+        }
+
+    except Exception as e:
+
+        # Prevent server crash and return error
+        return {"error": str(e)}

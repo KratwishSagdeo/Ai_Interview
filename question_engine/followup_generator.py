@@ -1,10 +1,9 @@
 # ----------------------------------------------------
-# Import OpenAI library
+# Import requests library
 # ----------------------------------------------------
 
-# The OpenAI client is used to communicate with the OpenAI API
-# This allows our system to generate intelligent follow-up questions
-from openai import OpenAI
+# requests is used to send HTTP requests to the local Ollama server
+import requests
 
 
 # ----------------------------------------------------
@@ -13,13 +12,16 @@ from openai import OpenAI
 
 class FollowUpGenerator:
 
-    # Constructor method
-    # This runs automatically when the class is initialized
+    # ----------------------------------------------------
+    # Constructor
+    # ----------------------------------------------------
+
+    # This function runs when the class is initialized
     def __init__(self):
 
-        # Initialize OpenAI API client
-        # This object will be used to send prompts to the language model
-        self.client = OpenAI()
+        # URL of the local Ollama API server
+        # Ollama runs on port 11434 by default
+        self.url = "http://localhost:11434/api/generate"
 
 
     # ----------------------------------------------------
@@ -38,63 +40,77 @@ class FollowUpGenerator:
 
 
         # ----------------------------------------------------
-        # Construct the AI prompt
+        # Construct prompt for the LLM
         # ----------------------------------------------------
 
-        # The prompt gives context to the AI model
-        # This helps it behave like a real technical interviewer
+        # This prompt instructs the model to behave like a real interviewer
         prompt = f"""
 You are a senior technical interviewer.
 
 The candidate previously answered the following question.
 
-Question asked:
+Question:
 {question}
 
-Candidate answer:
+Candidate Answer:
 {answer}
 
-Candidate skills:
+Candidate Skills:
 {skills}
 
-Previously asked questions:
+Previously Asked Questions:
 {previous_questions}
 
 Your task:
 1. Analyze the candidate's answer
 2. Ask a deeper follow-up question
-3. The question should probe deeper understanding
-4. Do NOT repeat previous questions
-5. Keep the question short and interview-style
+3. Do NOT repeat previous questions
+4. Keep the question short and interview-style
+5. Focus on technical depth
 """
 
 
         # ----------------------------------------------------
-        # Call OpenAI model
+        # Call Ollama API
         # ----------------------------------------------------
 
-        # Send the prompt to the OpenAI model
-        # The model will generate a follow-up interview question
-        response = self.client.chat.completions.create(
+        try:
 
-            # Use lightweight model for fast response
-            model="gpt-4.1-mini",
+            # Send POST request to Ollama local server
+            response = requests.post(
 
-            # Messages follow chat format used by OpenAI models
-            messages=[
-                {"role": "system", "content": "You are an expert technical interviewer."},
-                {"role": "user", "content": prompt}
-            ]
-        )
+                # API endpoint
+                self.url,
+
+                # JSON payload sent to model
+                json={
+                    "model": "phi3",        # Model name (make sure you ran: ollama run phi3)
+                    "prompt": prompt,       # Prompt we created above
+                    "stream": False         # Disable streaming (we want full response)
+                }
+            )
 
 
-        # ----------------------------------------------------
-        # Extract model response
-        # ----------------------------------------------------
+            # Convert response to JSON
+            result = response.json()
 
-        # The model response contains multiple choices
-        # We take the first generated message
-        followup = response.choices[0].message.content.strip()
+
+            # Extract generated text from response
+            followup = result.get("response", "").strip()
+
+
+            # If model returns empty response, fallback
+            if not followup:
+                followup = "Can you explain that in more detail?"
+
+
+        except Exception as e:
+
+            # Print error for debugging
+            print("Ollama error:", e)
+
+            # Fallback question if something fails
+            followup = "Can you explain that in more detail?"
 
 
         # ----------------------------------------------------
