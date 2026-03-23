@@ -1,0 +1,15 @@
+{
+  "name": "ai-interview-backend",
+  "version": "1.0.0",
+  "description": "AI Interview follow-up question generator using Google Gemini",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

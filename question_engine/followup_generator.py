@@ -1,120 +1,97 @@
-# ----------------------------------------------------
-# Import requests library
-# ----------------------------------------------------
-
-# requests is used to send HTTP requests to the local Ollama server
+import os
+import time
 import requests
 
 
-# ----------------------------------------------------
-# FollowUpGenerator Class
-# ----------------------------------------------------
-
 class FollowUpGenerator:
 
-    # ----------------------------------------------------
-    # Constructor
-    # ----------------------------------------------------
-
-    # This function runs when the class is initialized
     def __init__(self):
+        self.api_key = os.getenv("GROQ_API_KEY")
 
-        # URL of the local Ollama API server
-        # Ollama runs on port 11434 by default
-        self.url = "http://localhost:11434/api/generate"
+        if not self.api_key:
+            raise ValueError("GROQ_API_KEY environment variable is not set")
 
-
-    # ----------------------------------------------------
-    # Generate follow-up question
-    # ----------------------------------------------------
-
-    def generate_followup(self, question, answer, skills=None, previous_questions=None):
-
-        # If skills list is not provided initialize empty list
-        if skills is None:
-            skills = []
-
-        # If previous_questions list is not provided initialize empty list
-        if previous_questions is None:
-            previous_questions = []
+        self.url = "https://api.groq.com/openai/v1/chat/completions"
 
 
-        # ----------------------------------------------------
-        # Construct prompt for the LLM
-        # ----------------------------------------------------
-
-        # This prompt instructs the model to behave like a real interviewer
-        prompt = f"""
-You are a senior technical interviewer.
-
-The candidate previously answered the following question.
-
-Question:
-{question}
-
-Candidate Answer:
-{answer}
-
-Candidate Skills:
-{skills}
-
-Previously Asked Questions:
-{previous_questions}
-
-Your task:
-1. Analyze the candidate's answer
-2. Ask a deeper follow-up question
-3. Do NOT repeat previous questions
-4. Keep the question short and interview-style
-5. Focus on technical depth
-"""
-
-
-        # ----------------------------------------------------
-        # Call Ollama API
-        # ----------------------------------------------------
+    def generate_followup(self, question, answer, skills=None, previous_questions=None, job_role=None):
 
         try:
+            start_time = time.time()
 
-            # Send POST request to Ollama local server
-            response = requests.post(
+            answer = answer[:500]
 
-                # API endpoint
-                self.url,
+            # ✅ Build role context string if role is provided
+            role_context = ""
+            if job_role:
+                role_title = job_role.get("title", "Software Engineer")
+                key_topics = ", ".join(job_role.get("key_topics", []))
+                role_context = f"""
+The candidate is interviewing for: {role_title}
+Key topics for this role: {key_topics}
+Keep your follow-up question relevant to this role.
+"""
 
-                # JSON payload sent to model
-                json={
-                    "model": "phi3",        # Model name (make sure you ran: ollama run phi3)
-                    "prompt": prompt,       # Prompt we created above
-                    "stream": False         # Disable streaming (we want full response)
-                }
-            )
+            prompt = f"""You are a technical interviewer.
+{role_context}
+Ask 1 short follow-up interview question based on the candidate's answer below.
 
+Rules:
+- Focus on ONE concept from the answer
+- Keep it relevant to the job role above
+- Max 15 words
+- Return ONLY the question ending with '?'
 
-            # Convert response to JSON
-            result = response.json()
+Q: {question}
+A: {answer}
+"""
 
+            print("🔥 Calling Groq via REST...")
 
-            # Extract generated text from response
-            followup = result.get("response", "").strip()
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 50,
+                "temperature": 0.7,
+                "top_p": 0.9
+            }
 
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
 
-            # If model returns empty response, fallback
-            if not followup:
-                followup = "Can you explain that in more detail?"
+            response = requests.post(self.url, json=payload, headers=headers)
+            data = response.json()
 
+            print("🧠 Groq Raw:", data)
+
+            if "error" in data:
+                error = data["error"]
+                code = error.get("code", "")
+                if response.status_code == 429 or code == "rate_limit_exceeded":
+                    print(f"⚠️ Groq quota exceeded (429): {error.get('message', 'Limit reached')}")
+                    return "Can you elaborate on that concept in more detail?"
+                raise Exception(error.get("message", "Unknown Groq error"))
+
+            followup = data["choices"][0]["message"]["content"].strip()
+
+            # ✅ Simple validation — just check it has enough words
+            if len(followup.split()) < 3:
+                raise Exception(f"Bad output: {followup}")
+
+            # ✅ Ensure it ends with ? (add one if missing)
+            if not followup.endswith("?"):
+                followup = followup + "?"
+
+            elapsed = time.time() - start_time
+            print(f"✅ Groq Output: {followup}")
+            print(f"⏱ Groq Time: {elapsed:.2f}s")
+
+            return followup
 
         except Exception as e:
-
-            # Print error for debugging
-            print("Ollama error:", e)
-
-            # Fallback question if something fails
-            followup = "Can you explain that in more detail?"
-
-
-        # ----------------------------------------------------
-        # Return follow-up question
-        # ----------------------------------------------------
-
-        return followup
+            print("❌ Groq FAILED:", e)
+            return "Can you explain that in more detail?"

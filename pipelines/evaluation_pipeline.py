@@ -4,6 +4,7 @@ from email.mime import audio
 import pickle
 import librosa
 import soundfile as sf
+import time
 from audio.audio_loader import load_audio
 
 
@@ -121,25 +122,39 @@ class SpeechEvaluationPipeline:
 
 
     # ----------------------------------------------------
-    # Main Evaluation Function
+    # STEP A: Preprocess + Transcribe ONLY
     # ----------------------------------------------------
+    # Returns transcript and timestamps as fast as possible
+    # so Gemini can start generating while analysis continues.
 
-    def evaluate(self, audio):
+    def transcribe(self, audio_path):
 
-        # STEP 1 — Speech Recognition
-        # Convert audio speech into transcript text
-        # Also returns timestamps for each spoken word
-        self.preprocess_audio(audio)
-        #text, timestamps = self.asr.transcribe(audio)
-        audio_data, sample_rate = load_audio(audio)
-        text, timestamps = self.asr.transcribe(audio)
-        pause_count = self.pause_detector.detect_pauses(audio)
+        t0 = time.time()
 
-        # STEP 2 — Handle empty transcript
-        # If ASR failed or detected no speech
+        # Run Whisper STT directly (faster-whisper handles decoding in C)
+        text, timestamps = self.asr.transcribe(audio_path)
+
+        elapsed = time.time() - t0
+        print(f"⏱  STT Time: {elapsed:.2f}s")
+
+        return text, timestamps
+
+
+    # ----------------------------------------------------
+    # STEP B: Analyze fluency metrics (no STT)
+    # ----------------------------------------------------
+    # Runs in parallel with Gemini follow-up generation.
+
+    def analyze(self, audio_path, text, timestamps):
+
+        t0 = time.time()
+
+        # Pause detection (WebRTC VAD)
+        pause_count = self.pause_detector.detect_pauses(audio_path)
+
+        # Handle empty transcript
         if text is None or text.strip() == "":
 
-            # Return default zero metrics
             return {
                 "transcript": "",
                 "fluency_score": 0,
@@ -151,46 +166,28 @@ class SpeechEvaluationPipeline:
             }
 
 
-        # STEP 3 — Detect filler words
-        # Example fillers: um, uh, like, you know
+        # Detect filler words
         disfluency = self.disfluency.detect(text)
 
-
-        # STEP 4 — Grammar analysis
-        # Count grammar mistakes in transcript
+        # Grammar analysis
         grammar_errors = self.grammar.analyze(text)
 
-
-        # STEP 5 — Lexical analysis
-        # Compute vocabulary richness metrics
+        # Lexical analysis
         lexical_results = self.lexical_analyzer.analyze(text)
 
-
-        # STEP 6 — Pause detection
-        # Count pauses longer than 0.5 seconds
-        # STEP 6 — Pause detection using WebRTC VAD
-        #pause_count = self.pause_detector.detect_pauses(audio)
+        # Pause count
         print("Pause count:", pause_count)
 
-
-        # STEP 7 — Calculate speech duration
-        # Last timestamp indicates end of speech
+        # Calculate speech duration
         duration_seconds = timestamps[-1][1] if timestamps and len(timestamps) > 0 else 1
-
-        # Convert duration to minutes
         duration_minutes = duration_seconds / 60
 
-
-        # STEP 8 — Calculate speech rate
-        # Words spoken per minute
+        # Speech rate
         word_count = lexical_results["word_count"]
-
         speech_rate = word_count / duration_minutes if duration_minutes > 0 else 0
         print("Speech rate:", speech_rate)
 
-
-        # STEP 9 — Build feature vector
-        # This will be fed into the ML fluency model
+        # Build feature vector for ML model
         features = [[
             speech_rate,
             pause_count,
@@ -200,53 +197,36 @@ class SpeechEvaluationPipeline:
             lexical_results["sentence_complexity"]
         ]]
 
-
-        # STEP 10 — ML Fluency Scoring
+        # ML Fluency Scoring
         if self.fluency_model is not None:
 
             try:
-
-                # Predict fluency score using trained ML model
                 score = self.fluency_model.predict(features)[0]
 
             except Exception:
-
-                # If prediction fails use default score
                 score = 50
 
         else:
 
-            # ------------------------------------------------
             # Rule-based scoring fallback
-            # ------------------------------------------------
-
             score = 70
 
-            # Penalize filler words
             score -= disfluency["fillers"] * 3
-
-            # Penalize grammar mistakes
             score -= grammar_errors * 2
-
-            # Penalize pauses
             score -= pause_count * 2
 
-            # Penalize slow speech
             if speech_rate < 100:
                 score -= 5
 
-            # Penalize overly fast speech
             if speech_rate > 180:
                 score -= 5
 
-            # Reward lexical diversity
             score += lexical_results["type_token_ratio"] * 10
-
-            # Clamp score between 0 and 100
             score = max(0, min(100, score))
 
+        elapsed = time.time() - t0
+        print(f"⏱  Analysis Time: {elapsed:.2f}s")
 
-        # STEP 11 — Return final evaluation result
         return {
             "transcript": text,
             "fluency_score": float(score),
@@ -256,14 +236,39 @@ class SpeechEvaluationPipeline:
             "grammar_errors": grammar_errors,
             "lexical_diversity": lexical_results["type_token_ratio"]
         }
+
+
+    # ----------------------------------------------------
+    # Original evaluate() — kept for backward compatibility
+    # ----------------------------------------------------
+
+    def evaluate(self, audio_path):
+
+        text, timestamps = self.transcribe(audio_path)
+        return self.analyze(audio_path, text, timestamps)
+
+
+    # ----------------------------------------------------
+    # Preprocess audio to 16kHz mono (Trims silence & limits to 15s)
+    # ----------------------------------------------------
+
     def preprocess_audio(self, audio_path):
 
-
-    # Load audio and automatically resample to 16000 Hz
+        t0 = time.time()
+        
+        # Load audio and automatically resample to 16000 Hz
         audio, sr = librosa.load(audio_path, sr=16000, mono=True)
-
-    # Debug output
-        print("Audio resampled to:", sr)
-
-    # Save the corrected audio back to the same file
-        sf.write(audio_path, audio, 16000)
+        
+        # Trim leading and trailing silence (top_db=30 is a good default)
+        audio_trimmed, _ = librosa.effects.trim(audio, top_db=30)
+        
+        # Limit to 15 seconds max to guarantee fast processing
+        max_samples = 15 * sr
+        if len(audio_trimmed) > max_samples:
+            audio_trimmed = audio_trimmed[:max_samples]
+            
+        # Save the optimized audio back to the same file
+        sf.write(audio_path, audio_trimmed, 16000)
+        
+        elapsed = time.time() - t0
+        print(f"⏱  Audio Preprocessing Time: {elapsed:.2f}s (Len: {len(audio_trimmed)/sr:.1f}s)")
