@@ -12,6 +12,11 @@ import logging
 
 logger = logging.getLogger("interview_manager")
 
+def resolve_job_role(user_role: str, inferred_role: str) -> str:
+    if user_role and user_role.strip():
+        return user_role.strip()
+    return inferred_role
+
 # ----------------------------------------------------
 # Constants
 # ----------------------------------------------------
@@ -57,8 +62,28 @@ class InterviewManager:
 
     def start_interview(self, resume_path, job_role_key="software_engineer"):
 
-        self.job_role_key = job_role_key
-        self.job_role = get_role(job_role_key)
+        # Step 7: Normalize role
+        normalized_key = job_role_key.strip().lower().replace(" ", "_").replace("-", "_") if job_role_key else "software_engineer"
+        
+        # Get base role config
+        base_role = get_role(normalized_key)
+        inferred_role = base_role["title"]
+
+        # Step 4: Resolve the final role
+        user_role = job_role_key if job_role_key else ""
+        final_role_title = resolve_job_role(user_role, inferred_role)
+
+        # Step 5: Add debug logging
+        print("USER ROLE:", user_role)
+        print("INFERRED ROLE:", inferred_role)
+        print("FINAL ROLE:", final_role_title)
+
+        # Assign back
+        base_role["title"] = final_role_title
+        
+        self.job_role_key = normalized_key
+        self.job_role = base_role
+
         print(f"🎯 Job Role: {self.job_role['title']}")
 
         resume_text = self.parser.extract_text(resume_path)

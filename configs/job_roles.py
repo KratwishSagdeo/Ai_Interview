@@ -113,12 +113,20 @@ JOB_ROLES = {
 
 def get_role(role_key: str) -> dict:
     """Returns role config or a generic fallback."""
-    return JOB_ROLES.get(role_key, {
+    role = JOB_ROLES.get(role_key)
+    if role:
+        # Return a copy to prevent mutating the global dictionary
+        role_copy = role.copy()
+        # Shallow copy is fine since lists are only read, but let's be safe
+        role_copy["focus_skills"] = list(role["focus_skills"])
+        role_copy["key_topics"] = list(role["key_topics"])
+        return role_copy
+    return {
         "title": "General Software Engineer",
         "focus_skills": [],
         "description": "General technical role",
         "key_topics": ["problem solving", "technical knowledge", "system design"]
-    })
+    }
 
 
 def list_roles() -> list:

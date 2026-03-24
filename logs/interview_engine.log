@@ -1,0 +1,12 @@
+2026-03-24 22:21:18 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 22:33:23 | INFO     | interview_manager         | Current difficulty: easy
+2026-03-24 22:33:23 | INFO     | followup_generator        | Calling Groq for follow-up question
+2026-03-24 22:33:26 | INFO     | followup_generator        | Groq follow-up generated in 2.88s: How do you apply XGBoost?
+2026-03-24 22:54:20 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 22:55:08 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 22:57:26 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 23:03:32 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 23:04:27 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 23:12:13 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 23:13:01 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 23:14:03 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log

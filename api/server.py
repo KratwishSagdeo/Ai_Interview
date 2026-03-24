@@ -120,6 +120,11 @@ async def upload_resume(
     job_role: str = Form(default="software_engineer"),
     _: str = Depends(verify_api_key)
 ):
+    print("Incoming job_role from request:", job_role)
+    
+    if not job_role or len(job_role.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Invalid job role")
+
     check_rate_limit(request, "upload_resume")
     cleanup_expired_sessions()
 
@@ -132,13 +137,18 @@ async def upload_resume(
         manager = InterviewManager()
         question = await asyncio.to_thread(manager.start_interview, path, job_role)
 
-        sessions[session_id] = manager
+        sessions[session_id] = {
+            "session_id": session_id,
+            "manager": manager,
+            "job_role": manager.job_role.get("title", job_role),
+            "skills": manager.skills
+        }
         session_created_at[session_id] = time.time()
 
         return {
             "session_id": session_id,
             "question": question,
-            "job_role": manager.job_role.get("title", job_role)
+            "job_role": sessions[session_id]["job_role"]
         }
 
     except Exception as e:
@@ -171,7 +181,8 @@ async def submit_answer(
         if session_id not in sessions:
             return {"error": "Invalid session_id"}
 
-        manager = sessions[session_id]
+        session = sessions[session_id]
+        manager = session["manager"]
 
         # ✅ Block further answers if interview already finished
         if manager.is_finished:
@@ -263,7 +274,8 @@ async def get_report(session_id: str, _: str = Depends(verify_api_key)):
     if session_id not in sessions:
         return {"error": "Invalid session_id or session has expired"}
 
-    manager = sessions[session_id]
+    session = sessions[session_id]
+    manager = session["manager"]
 
     try:
         report = manager.generate_report()
@@ -288,7 +300,8 @@ async def end_interview(session_id: str, _: str = Depends(verify_api_key)):
     if session_id not in sessions:
         return {"error": "Invalid session_id"}
 
-    manager = sessions[session_id]
+    session = sessions[session_id]
+    manager = session["manager"]
     manager.is_finished = True
     manager.end_reason = "manual"
 
@@ -344,7 +357,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         await websocket.close()
         return
 
-    manager = sessions[session_id]
+    session = sessions[session_id]
+    manager = session["manager"]
     buffer = RealtimeAudioBuffer(sample_rate=16000)
 
     async def process_buffered_audio():
