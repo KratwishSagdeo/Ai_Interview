@@ -10,3 +10,9 @@
 2026-03-24 23:12:13 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
 2026-03-24 23:13:01 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
 2026-03-24 23:14:03 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-24 23:52:57 | INFO     | interview_manager         | Current difficulty: easy
+2026-03-24 23:52:57 | INFO     | followup_generator        | Calling Groq for follow-up question
+2026-03-24 23:52:59 | INFO     | followup_generator        | Groq follow-up generated in 2.02s: XGBoost: how does it handle overfitting?
+2026-03-25 00:59:26 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-25 01:06:49 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+2026-03-25 01:13:14 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
