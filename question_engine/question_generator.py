@@ -44,7 +44,7 @@ class QuestionGenerator:
     # Generate questions based on skills
     # ----------------------------------------------------
 
-    def generate_questions(self, skills):
+    def generate_questions(self, skills, experience_level="beginner"):
 
         # List to store generated questions
         questions = []

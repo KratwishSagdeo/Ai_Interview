@@ -1,8 +1,8 @@
 # Import spaCy NLP library
 import spacy
 
-# Load transformer based English NLP model
-nlp = spacy.load("en_core_web_trf")
+# Load general English NLP model
+nlp = spacy.load("en_core_web_sm")
 
 
 class LexicalAnalyzer:

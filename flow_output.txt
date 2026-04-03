@@ -1,0 +1,14 @@
+C:\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.2) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+1. Getting job roles...
+Roles defined: 8
+
+2. Uploading resume...
+Response Code: 200
+Response JSON: {'session_id': '7a704eb0-6507-489c-8826-e1db98d41a82', 'question': 'Hello! Welcome to your mock interview for the software_engineer role. To start, could you please introduce yourself?', 'job_role': 'software_engineer'}
+
+3. Session ID: 7a704eb0-6507-489c-8826-e1db98d41a82
+First Question: Hello! Welcome to your mock interview for the software_engineer role. To start, could you please introduce yourself?
+
+4. Validating UUID...
+UUID is valid!

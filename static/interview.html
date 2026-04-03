@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusAI — Interview Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07080a;
+      --surface: #0e1014;
+      --surface2: #141619;
+      --border: rgba(255,255,255,0.07);
+      --border-bright: rgba(255,255,255,0.15);
+      --accent: #c8ff57;
+      --accent-dim: rgba(200,255,87,0.12);
+      --accent-glow: rgba(200,255,87,0.35);
+      --red: #ff4d4d;
+      --blue: #4d9fff;
+      --purple: #b57bff;
+      --text: #f0f0ee;
+      --text-muted: #6b6e75;
+      --text-dim: #3a3d44;
+      --radius: 12px;
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --font-serif: 'Instrument Serif', serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-display);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* ── GRID BG ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    #app {
+      position: relative; z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── NAV ── */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 0 40px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 52px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em;
+    }
+    .logo-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow);
+      animation: breathe 3s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%,100% { box-shadow: 0 0 20px var(--accent-glow); transform: scale(1); }
+      50% { box-shadow: 0 0 35px var(--accent-glow), 0 0 60px rgba(200,255,87,0.15); transform: scale(1.08); }
+    }
+    .nav-tag {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--text-muted); letter-spacing: 0.08em;
+      border: 1px solid var(--border); border-radius: 99px;
+      padding: 4px 12px;
+    }
+
+    /* ── HERO ── */
+    .hero { margin-bottom: 52px; }
+    .hero-eyebrow {
+      font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase;
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .hero-eyebrow::before {
+      content: ''; display: inline-block;
+      width: 24px; height: 1px; background: var(--accent);
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 3.6rem);
+      font-weight: 800; line-height: 1.05;
+      letter-spacing: -0.04em;
+      margin-bottom: 16px;
+    }
+    .hero h1 em {
+      font-family: var(--font-serif); font-style: italic;
+      font-weight: 400; color: var(--accent);
+    }
+    .hero-sub {
+      font-family: var(--font-mono); font-size: 0.82rem;
+      color: var(--text-muted); line-height: 1.7; max-width: 480px;
+    }
+
+    /* ── SECTION LABEL ── */
+    .section-label {
+      font-family: var(--font-mono); font-size: 0.7rem;
+      color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    /* ── SETUP PANEL ── */
+    #setup-panel {
+      display: grid; gap: 28px;
+      animation: fadeUp 0.5s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--border-bright); }
+
+    /* ── UPLOAD ZONE ── */
+    .upload-zone {
+      border: 1.5px dashed var(--border-bright);
+      border-radius: var(--radius);
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative; overflow: hidden;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .upload-icon {
+      font-size: 2rem; margin-bottom: 10px;
+      display: block;
+    }
+    .upload-label {
+      font-size: 0.88rem; color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .upload-label strong { color: var(--text); }
+    .upload-status {
+      margin-top: 10px; font-family: var(--font-mono);
+      font-size: 0.76rem; color: var(--accent);
+      display: none;
+    }
+
+    /* ── SELECT ── */
+    .field-label {
+      font-size: 0.78rem; font-weight: 600;
+      color: var(--text-muted); letter-spacing: 0.04em;
+      text-transform: uppercase; margin-bottom: 10px;
+      display: block;
+    }
+    select {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px; padding: 12px 16px;
+      color: var(--text); font-family: var(--font-display);
+      font-size: 0.92rem; cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6e75' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      transition: border-color 0.2s;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+
+    /* ── CHIP GRID ── */
+    .chip-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .chip-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .chip {
+      padding: 14px 12px; border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer; transition: all 0.2s;
+      text-align: center;
+    }
+    .chip:hover { border-color: var(--border-bright); }
+    .chip .chip-icon { font-size: 1.3rem; display: block; margin-bottom: 6px; }
+    .chip .chip-title { font-size: 0.82rem; font-weight: 700; display: block; }
+    .chip .chip-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; font-family: var(--font-mono); }
+
+    .chip.selected-beginner   { border-color: #4ade80; background: rgba(74,222,128,0.08); }
+    .chip.selected-intermediate { border-color: #fbbf24; background: rgba(251,191,36,0.08); }
+    .chip.selected-expert     { border-color: #f87171; background: rgba(248,113,113,0.08); }
+    .chip.selected-type       { border-color: var(--accent); background: var(--accent-dim); }
+
+    /* ── VOICE ROW ── */
+    .voice-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--surface2); border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .voice-info .vi-title { font-size: 0.88rem; font-weight: 600; }
+    .voice-info .vi-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; font-family: var(--font-mono); }
+    .toggle { position: relative; width: 48px; height: 26px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--surface); border: 1px solid var(--border-bright);
+      border-radius: 99px; cursor: pointer; transition: 0.3s;
+    }
+    .toggle-track::before {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; left: 3px; top: 3px;
+      background: var(--text-muted); border-radius: 50%; transition: 0.3s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent-dim); border-color: var(--accent); }
+    .toggle input:checked + .toggle-track::before { background: var(--accent); transform: translateX(22px); }
+
+    /* ── API KEY ── */
+    .input-wrap { position: relative; }
+    .input-wrap input {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border-bright); border-radius: 8px;
+      padding: 12px 16px; color: var(--text);
+      font-family: var(--font-mono); font-size: 0.85rem;
+      transition: border-color 0.2s;
+    }
+    .input-wrap input::placeholder { color: var(--text-dim); }
+    .input-wrap input:focus { outline: none; border-color: var(--accent); }
+
+    /* ── START BTN ── */
+    #btn-init {
+      width: 100%; padding: 18px;
+      background: var(--accent); color: #07080a;
+      border: none; border-radius: 10px;
+      font-family: var(--font-display); font-size: 1rem; font-weight: 800;
+      cursor: pointer; letter-spacing: -0.01em;
+      transition: all 0.2s;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    #btn-init::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.5s;
+    }
+    #btn-init:hover::before { transform: translateX(100%); }
+    #btn-init:hover { box-shadow: 0 0 40px var(--accent-glow); transform: translateY(-1px); }
+    #btn-init:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    #btn-init .btn-arrow {
+      font-size: 1.1rem;
+      transition: transform 0.2s;
+    }
+    #btn-init:hover .btn-arrow { transform: translateX(4px); }
+
+    /* ── STATUS BAR ── */
+    #status-bar {
+      font-family: var(--font-mono); font-size: 0.76rem;
+      color: var(--text-muted); padding: 10px 0;
+      display: flex; align-items: center; gap: 8px;
+      min-height: 36px;
+    }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--text-dim); flex-shrink: 0;
+    }
+    .status-dot.active { background: var(--red); animation: pulse-dot 1s infinite; }
+    .status-dot.ready  { background: var(--accent); }
+    .status-dot.ai     { background: var(--blue); animation: pulse-dot 1.5s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── INTERVIEW PANEL ── */
+    #interview-panel { display: none; animation: fadeUp 0.4s ease both; }
+
+    .session-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    .session-info { display: flex; align-items: center; gap: 12px; }
+    .session-badge {
+      font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em;
+      padding: 5px 12px; border-radius: 99px;
+      border: 1px solid; display: flex; align-items: center; gap: 6px;
+    }
+    .session-badge.beginner   { color: #4ade80; border-color: #4ade80; background: rgba(74,222,128,0.08); }
+    .session-badge.intermediate { color: #fbbf24; border-color: #fbbf24; background: rgba(251,191,36,0.08); }
+    .session-badge.expert     { color: #f87171; border-color: #f87171; background: rgba(248,113,113,0.08); }
+    .q-counter {
+      font-family: var(--font-mono); font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+    /* ── QUESTION CARD ── */
+    .question-card {
+      background: var(--surface);
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 20px;
+      position: relative; overflow: hidden;
+    }
+    .question-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+    .q-label {
+      font-family: var(--font-mono); font-size: 0.68rem;
+      color: var(--accent); letter-spacing: 0.15em;
+      text-transform: uppercase; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* AI speaking animation */
+    .wave-bars {
+      display: flex; align-items: center; gap: 3px; height: 16px;
+    }
+    .wave-bar {
+      width: 3px; background: var(--blue); border-radius: 2px;
+      animation: wave 1s ease-in-out infinite;
+    }
+    .wave-bar:nth-child(1) { animation-delay: 0s; height: 6px; }
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; height: 10px; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; height: 14px; }
+    .wave-bar:nth-child(4) { animation-delay: 0.45s; height: 10px; }
+    .wave-bar:nth-child(5) { animation-delay: 0.6s; height: 6px; }
+    @keyframes wave {
+      0%,100% { transform: scaleY(0.5); opacity: 0.5; }
+      50% { transform: scaleY(1.2); opacity: 1; }
+    }
+    #ai-speaking { display: none; align-items: center; gap: 10px; margin-bottom: 10px; font-family: var(--font-mono); font-size: 0.76rem; color: var(--blue); }
+    #ai-speaking.visible { display: flex; }
+
+    #question-text {
+      font-size: 1.08rem; line-height: 1.75; color: var(--text);
+      font-weight: 400;
+    }
+
+    /* ── TRANSCRIPT ── */
+    .transcript-wrap {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      min-height: 80px;
+      margin-bottom: 20px;
+      transition: border-color 0.3s;
+    }
+    .transcript-wrap.recording { border-color: var(--red); }
+    .transcript-label {
+      font-family: var(--font-mono); font-size: 0.68rem;
+      color: var(--text-dim); letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    #transcript-text {
+      font-family: var(--font-mono); font-size: 0.84rem;
+      color: var(--text-muted); line-height: 1.7;
+    }
+    #transcript-text.has-content { color: var(--text); }
+
+    /* ── SCORES ── */
+    #score-section { display: none; margin-bottom: 20px; }
+    .scores-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+    .score-tile {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 12px; text-align: center;
+    }
+    .score-tile .st-label { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+    .score-tile .st-value { font-size: 1.4rem; font-weight: 800; color: var(--accent); }
+
+    /* ── EVAL ── */
+    #eval-section { display: none; margin-bottom: 20px; }
+    .eval-card {
+      background: var(--surface);
+      border: 1px solid rgba(181,123,255,0.25);
+      border-radius: var(--radius); padding: 20px;
+      border-left: 3px solid var(--purple);
+    }
+    .eval-label {
+      font-family: var(--font-mono); font-size: 0.68rem;
+      color: var(--purple); letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    #eval-text {
+      font-size: 0.88rem; line-height: 1.7;
+      color: var(--text-muted);
+    }
+
+    /* ── ACTION BUTTONS ── */
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+    .btn {
+      padding: 11px 20px; border-radius: 8px; border: none;
+      font-family: var(--font-display); font-size: 0.86rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); }
+
+    .btn-record {
+      background: var(--accent); color: #07080a;
+    }
+    .btn-record:hover:not(:disabled) { box-shadow: 0 0 24px var(--accent-glow); }
+
+    .btn-stop {
+      background: var(--red); color: white; display: none;
+    }
+    .btn-stop:hover:not(:disabled) { box-shadow: 0 0 24px rgba(255,77,77,0.4); }
+
+    .btn-next {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border-bright); display: none;
+    }
+    .btn-next:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+    .btn-end {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-end:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+
+    .btn-pdf {
+      background: var(--surface2); color: #4ade80;
+      border: 1px solid rgba(74,222,128,0.3); display: none;
+    }
+    .btn-pdf:hover:not(:disabled) { box-shadow: 0 0 16px rgba(74,222,128,0.2); }
+
+    /* recording pulse on stop btn */
+    @keyframes rec-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,77,77,0.5)} 50%{box-shadow:0 0 0 8px rgba(255,77,77,0)} }
+    .btn-stop { animation: rec-pulse 1.4s infinite; }
+
+    /* ── REPORT ── */
+    #report-section { display: none; margin-top: 32px; }
+    .report-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .report-title {
+      font-size: 1.2rem; font-weight: 800; letter-spacing: -0.02em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .report-title::before { content: '📊'; font-size: 1.1rem; }
+    #report-body {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      font-family: var(--font-mono); font-size: 0.78rem;
+      color: var(--text-muted); line-height: 1.8;
+      white-space: pre-wrap;
+      max-height: 420px; overflow-y: auto;
+    }
+    #report-body::-webkit-scrollbar { width: 4px; }
+    #report-body::-webkit-scrollbar-track { background: transparent; }
+    #report-body::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 4px; }
+
+    /* ── MODALS ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+      z-index: 90; display: none;
+    }
+    .modal {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(0.9);
+      z-index: 100; display: none;
+      background: var(--surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 16px; padding: 36px 32px;
+      text-align: center; max-width: 400px; width: 90%;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      transition: transform 0.25s;
+    }
+    .modal.open { transform: translate(-50%,-50%) scale(1); }
+    .modal-icon { font-size: 2.5rem; margin-bottom: 14px; }
+    .modal h3 { font-size: 1.2rem; font-weight: 800; margin-bottom: 8px; }
+    .modal p { font-size: 0.86rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; font-family: var(--font-mono); }
+    .modal .btn-modal {
+      padding: 12px 28px; border-radius: 8px; border: none;
+      font-family: var(--font-display); font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; width: 100%;
+    }
+    .btn-modal-ok  { background: var(--accent); color: #07080a; }
+    .btn-modal-err { background: var(--red); color: white; }
+
+    /* ── HELPERS ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 560px) {
+      .two-col { grid-template-columns: 1fr; }
+      .chip-grid { grid-template-columns: 1fr; }
+      .scores-grid { grid-template-columns: repeat(2,1fr); }
+    }
+
+    /* entry animation stagger */
+    .card { animation: fadeUp 0.4s ease both; }
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.2s; }
+    .card:nth-child(5) { animation-delay: 0.25s; }
+    .card:nth-child(6) { animation-delay: 0.3s; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- NAV -->
+  <nav>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      NexusAI
+    </div>
+    <div class="nav-tag">Interview Platform v2.0</div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">AI-Powered Assessment</div>
+    <h1>Land Your<br /><em>Dream Role</em></h1>
+    <p class="hero-sub">Real-time voice interview with AI evaluation. Upload your resume, pick your role, and let the system adapt questions to your experience.</p>
+  </div>
+
+  <!-- STATUS -->
+  <div id="status-bar">
+    <span class="status-dot" id="dot"></span>
+    <span id="status-text">Configure your session below to begin.</span>
+  </div>
+
+  <!-- ───── SETUP PANEL ───── -->
+  <div id="setup-panel">
+
+    <!-- Resume upload -->
+    <div class="card">
+      <div class="section-label">01 — Resume</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="resume-input" accept=".pdf" />
+        <span class="upload-icon">📄</span>
+        <div class="upload-label">
+          <strong>Drop your resume here</strong><br />
+          PDF format · Max 10MB
+        </div>
+        <div class="upload-status" id="upload-status"></div>
+      </div>
+    </div>
+
+    <!-- Role + Difficulty -->
+    <div class="two-col">
+      <div class="card">
+        <div class="section-label">02 — Target Role</div>
+        <label class="field-label" for="job-role-input">Job Position</label>
+        <select id="job-role-input">
+          <option value="software_engineer">Software Engineer</option>
+          <option value="data_scientist">Data Scientist</option>
+          <option value="ml_engineer">ML Engineer</option>
+          <option value="cybersecurity_analyst">Cybersecurity Analyst</option>
+          <option value="frontend_developer">Frontend Developer</option>
+          <option value="devops_engineer">DevOps Engineer</option>
+          <option value="android_developer">Android Developer</option>
+          <option value="backend_developer">Backend Developer</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <div class="section-label">03 — Difficulty</div>
+        <div class="chip-grid">
+          <div class="chip selected-beginner" data-level="beginner" onclick="selectDifficulty(this)">
+            <span class="chip-icon">🟢</span>
+            <span class="chip-title">Beginner</span>
+            <span class="chip-sub">Conceptual</span>
+          </div>
+          <div class="chip" data-level="intermediate" onclick="selectDifficulty(this)">
+            <span class="chip-icon">🟡</span>
+            <span class="chip-title">Mid</span>
+            <span class="chip-sub">Applied</span>
+          </div>
+          <div class="chip" data-level="expert" onclick="selectDifficulty(this)">
+            <span class="chip-icon">🔴</span>
+            <span class="chip-title">Expert</span>
+            <span class="chip-sub">System design</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interview type -->
+    <div class="card">
+      <div class="section-label">04 — Interview Type</div>
+      <div class="chip-grid-2">
+        <div class="chip selected-type" data-type="full" onclick="selectType(this)">
+          <span class="chip-icon">📋</span>
+          <span class="chip-title">Full Interview</span>
+          <span class="chip-sub">Intro → Resume → Projects → Technical → HR</span>
+        </div>
+        <div class="chip" data-type="technical" onclick="selectType(this)">
+          <span class="chip-icon">⚡</span>
+          <span class="chip-title">Technical Only</span>
+          <span class="chip-sub">Deep technical questions only</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Voice + API Key -->
+    <div class="card">
+      <div class="section-label">05 — Preferences</div>
+      <div class="voice-row" style="margin-bottom:16px;">
+        <div class="voice-info">
+          <div class="vi-title">AI Voice</div>
+          <div class="vi-sub" id="voice-label">AI will speak questions aloud</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="voice-toggle" checked />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <label class="field-label">API Key <span style="font-weight:400;text-transform:none;color:var(--text-dim)">(optional)</span></label>
+      <div class="input-wrap">
+        <input type="password" id="api-key-input" placeholder="sk-ant-… or leave blank" />
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button id="btn-init">
+      Begin Interview Session
+      <span class="btn-arrow">→</span>
+    </button>
+
+  </div><!-- /setup-panel -->
+
+
+  <!-- ───── INTERVIEW PANEL ───── -->
+  <div id="interview-panel">
+
+    <div class="session-header">
+      <div class="session-info">
+        <div class="session-badge" id="session-badge">● Beginner</div>
+        <span class="q-counter" id="q-counter">Question 1</span>
+      </div>
+    </div>
+
+    <!-- AI speaking -->
+    <div id="ai-speaking">
+      <div class="wave-bars">
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+      </div>
+      AI is speaking…
+    </div>
+
+    <!-- Question -->
+    <div class="question-card">
+      <div class="q-label">— Current Question</div>
+      <p id="question-text">Loading your first question…</p>
+    </div>
+
+    <!-- Transcript -->
+    <div class="transcript-wrap" id="transcript-wrap">
+      <div class="transcript-label">Your Response</div>
+      <div id="transcript-text">Press <strong style="color:var(--text)">Start Speaking</strong> when ready…</div>
+    </div>
+
+    <!-- Scores -->
+    <div id="score-section">
+      <div class="scores-grid">
+        <div class="score-tile"><div class="st-label">Content</div><div class="st-value" id="sc-content">—</div></div>
+        <div class="score-tile"><div class="st-label">Fluency</div><div class="st-value" id="sc-fluency">—</div></div>
+        <div class="score-tile"><div class="st-label">Speech Rate</div><div class="st-value" id="sc-rate">—</div></div>
+        <div class="score-tile"><div class="st-label">Average</div><div class="st-value" id="sc-avg">—</div></div>
+      </div>
+    </div>
+
+    <!-- Eval -->
+    <div id="eval-section">
+      <div class="eval-card">
+        <div class="eval-label">AI Feedback</div>
+        <p id="eval-text"></p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-record" id="btn-start">▶ Start Speaking</button>
+      <button class="btn btn-stop"   id="btn-stop">⏹ Stop</button>
+      <button class="btn btn-next"   id="btn-next">Next Question ⏭</button>
+      <button class="btn btn-end"    id="btn-end">End Interview</button>
+    </div>
+    <div class="actions">
+      <button class="btn btn-pdf" id="btn-pdf">⬇ Download PDF Report</button>
+    </div>
+
+    <!-- Report -->
+    <div id="report-section">
+      <div class="report-header">
+        <div class="report-title">Interview Report</div>
+      </div>
+      <pre id="report-body"></pre>
+    </div>
+
+  </div><!-- /interview-panel -->
+
+</div><!-- /app -->
+
+<!-- Modals -->
+<div class="overlay" id="overlay-invalid"></div>
+<div class="modal" id="modal-invalid">
+  <div class="modal-icon">⚠️</div>
+  <h3 style="color:var(--red)">Off-Topic Response</h3>
+  <p id="modal-invalid-text">Your answer was not relevant to the question. Please try again.</p>
+  <button class="btn-modal btn-modal-err" onclick="closeModal('invalid')">Try Again</button>
+</div>
+
+<div class="overlay" id="overlay-complete"></div>
+<div class="modal" id="modal-complete">
+  <div class="modal-icon">🎉</div>
+  <h3 style="color:var(--accent)">Interview Complete!</h3>
+  <p id="modal-complete-text">Excellent performance! Your full report is ready below.</p>
+  <button class="btn-modal btn-modal-ok" onclick="closeModal('complete')">View Report</button>
+</div>
+
+
+<script>
+  const API_URL     = "http://localhost:8000";
+  const SAMPLE_RATE = 16000;
+  const FRAME_MS    = 30;
+  const FRAME_BYTES = SAMPLE_RATE * (FRAME_MS / 1000) * 2;
+
+  let SESSION_ID = null, WS_URL = null;
+  let ws, audioCtx, sourceNode, processorNode, stream;
+  let isRecording = false;
+  let selectedDifficulty = "beginner";
+  let selectedType = "full";
+  let voiceEnabled = true;
+  let questionCount = 1;
+
+  // ── DOM ──
+  const statusText    = document.getElementById("status-text");
+  const dot           = document.getElementById("dot");
+  const questionText  = document.getElementById("question-text");
+  const transcriptWrap = document.getElementById("transcript-wrap");
+  const transcriptText = document.getElementById("transcript-text");
+  const evalSection   = document.getElementById("eval-section");
+  const evalText      = document.getElementById("eval-text");
+  const btnStart      = document.getElementById("btn-start");
+  const btnStop       = document.getElementById("btn-stop");
+  const btnNext       = document.getElementById("btn-next");
+  const btnEnd        = document.getElementById("btn-end");
+  const btnPdf        = document.getElementById("btn-pdf");
+  const aiSpeaking    = document.getElementById("ai-speaking");
+  const scoreSection  = document.getElementById("score-section");
+
+  function setStatus(msg, mode = '') {
+    statusText.textContent = msg;
+    dot.className = 'status-dot' + (mode ? ' ' + mode : '');
+  }
+
+  // ── UPLOAD ──
+  const uploadZone   = document.getElementById("upload-zone");
+  const uploadStatus = document.getElementById("upload-status");
+  uploadZone.addEventListener("dragover",  e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+  uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+  uploadZone.addEventListener("drop",      e => { e.preventDefault(); uploadZone.classList.remove("drag-over"); });
+  document.getElementById("resume-input").addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (f) {
+      uploadStatus.style.display = "block";
+      uploadStatus.textContent   = "✓ " + f.name;
+    }
+  });
+
+  // ── CHIPS ──
+  function selectDifficulty(el) {
+    document.querySelectorAll("[data-level]").forEach(b => b.className = 'chip');
+    el.classList.add("selected-" + el.dataset.level);
+    selectedDifficulty = el.dataset.level;
+  }
+  function selectType(el) {
+    document.querySelectorAll("[data-type]").forEach(b => b.className = 'chip');
+    el.classList.add("selected-type");
+    selectedType = el.dataset.type;
+  }
+
+  // ── VOICE TOGGLE ──
+  const voiceToggle = document.getElementById("voice-toggle");
+  const voiceLabel  = document.getElementById("voice-label");
+  voiceToggle.addEventListener("change", () => {
+    voiceEnabled = voiceToggle.checked;
+    voiceLabel.textContent = voiceEnabled ? "AI will speak questions aloud" : "Voice disabled — text only";
+    if (!voiceEnabled) window.speechSynthesis.cancel();
+  });
+
+  // ── VOICE ENGINE ──
+  class InterviewVoice {
+    constructor() {
+      this.synth = window.speechSynthesis;
+      this.voice = null;
+      this._load();
+      setInterval(() => { if (this.synth.speaking) { this.synth.pause(); this.synth.resume(); } }, 10000);
+    }
+    _load() {
+      const set = () => {
+        const voices = this.synth.getVoices();
+        const prefs  = ["Google UK English Female","Google US English","Samantha"];
+        for (const name of prefs) {
+          const v = voices.find(v => v.name === name);
+          if (v) { this.voice = v; return; }
+        }
+        this.voice = voices.find(v => v.lang.startsWith("en")) || voices[0] || null;
+      };
+      this.synth.getVoices().length ? set() : this.synth.addEventListener("voiceschanged", set, { once: true });
+    }
+    speak(text) {
+      return new Promise(resolve => {
+        if (!text || !voiceEnabled) { resolve(); return; }
+        this.synth.cancel();
+        const utt = new SpeechSynthesisUtterance(text);
+        if (this.voice) utt.voice = this.voice;
+        utt.rate = 0.95;
+        utt.onend = utt.onerror = () => { aiSpeaking.classList.remove("visible"); resolve(); };
+        aiSpeaking.classList.add("visible");
+        this.synth.speak(utt);
+      });
+    }
+    stop() { this.synth.cancel(); aiSpeaking.classList.remove("visible"); }
+  }
+  const voice = new InterviewVoice();
+
+  async function speakAndEnable(text) {
+    btnStart.style.display = "none";
+    setStatus("AI is speaking…", "ai");
+    await voice.speak(text);
+    btnStart.style.display = "inline-flex";
+    setStatus("Ready — press Start Speaking 🎙️", "ready");
+  }
+
+  // ── WEBSOCKET ──
+  function connectWS() {
+    ws = new WebSocket(WS_URL);
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "start" }));
+      setStatus("Connected — ready to speak.", "ready");
+    };
+    ws.onclose = () => setStatus("Connection closed.");
+    ws.onerror = () => setStatus("WebSocket error ❌");
+
+    ws.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "question") {
+          questionText.textContent = data.text;
+          transcriptText.innerHTML = "Press <strong style='color:var(--text)'>Start Speaking</strong> when ready…";
+          transcriptText.classList.remove("has-content");
+          transcriptWrap.classList.remove("recording");
+          evalSection.style.display  = "none";
+          scoreSection.style.display = "none";
+          btnNext.style.display = "none";
+          document.getElementById("q-counter").textContent = "Question " + questionCount++;
+          await speakAndEnable(data.text);
+        }
+
+        if (data.type === "transcript") {
+          transcriptText.textContent = data.text;
+          transcriptText.classList.add("has-content");
+        }
+
+        if (data.type === "evaluation") {
+          evalSection.style.display = "block";
+          evalText.textContent = data.feedback;
+          btnNext.style.display  = "inline-flex";
+          btnStart.style.display = "none";
+          setStatus("Feedback received.", "ready");
+        }
+
+        if (data.type === "invalid") {
+          openModal("invalid", data.message);
+          btnStart.style.display = "inline-flex";
+          setStatus("Answer was off-topic — please try again.");
+        }
+
+        if (data.type === "scores") {
+          scoreSection.style.display = "block";
+          document.getElementById("sc-content").textContent = pct(data.content);
+          document.getElementById("sc-fluency").textContent = pct(data.fluency);
+          document.getElementById("sc-rate").textContent    = pct(data.rate);
+          document.getElementById("sc-avg").textContent     = pct(data.avg);
+        }
+
+        if (data.type === "complete") {
+          await handleComplete(data.report);
+        }
+      } catch(e) { console.warn("WS parse error:", e); }
+    };
+  }
+
+  // ── RECORDING ──
+  async function startRecording() {
+    stream     = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: SAMPLE_RATE, channelCount: 1 } });
+    audioCtx   = new AudioContext({ sampleRate: SAMPLE_RATE });
+    sourceNode = audioCtx.createMediaStreamSource(stream);
+    processorNode = audioCtx.createScriptProcessor(512, 1, 1);
+
+    let pcmBuffer = new Int16Array(0);
+    processorNode.onaudioprocess = (e) => {
+      if (!isRecording || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const f32   = e.inputBuffer.getChannelData(0);
+      const int16 = float32ToInt16(f32);
+      const merged = new Int16Array(pcmBuffer.length + int16.length);
+      merged.set(pcmBuffer); merged.set(int16, pcmBuffer.length);
+      pcmBuffer = merged;
+      while (pcmBuffer.byteLength >= FRAME_BYTES) {
+        ws.send(pcmBuffer.slice(0, FRAME_BYTES / 2).buffer);
+        pcmBuffer = pcmBuffer.slice(FRAME_BYTES / 2);
+      }
+    };
+    sourceNode.connect(processorNode);
+    processorNode.connect(audioCtx.destination);
+    isRecording = true;
+    transcriptWrap.classList.add("recording");
+    btnStart.style.display = "none";
+    btnStop.style.display  = "inline-flex";
+    setStatus("Recording… speak now 🎙️", "active");
+  }
+
+  function stopRecording() {
+    if (!isRecording) return;
+    isRecording = false;
+    transcriptWrap.classList.remove("recording");
+    btnStop.style.display = "none";
+    setStatus("Processing your answer…", "ai");
+    if (ws?.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: "end_of_speech", event: "end_of_speech" }));
+    processorNode?.disconnect();
+    sourceNode?.disconnect();
+    stream?.getTracks().forEach(t => t.stop());
+    audioCtx?.close();
+  }
+
+  function float32ToInt16(f32) {
+    const i16 = new Int16Array(f32.length);
+    for (let i = 0; i < f32.length; i++) {
+      const s = Math.max(-1, Math.min(1, f32[i]));
+      i16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return i16;
+  }
+
+  // ── INIT ──
+  document.getElementById("btn-init").addEventListener("click", async () => {
+    const resumeFile = document.getElementById("resume-input").files[0];
+    if (!resumeFile) { alert("Please upload your resume PDF first."); return; }
+
+    const jobRole = document.getElementById("job-role-input").value;
+    const apiKey  = document.getElementById("api-key-input").value;
+    const btn = document.getElementById("btn-init");
+
+    setStatus("Uploading resume…", "ai");
+    btn.disabled = true;
+
+    const form = new FormData();
+    form.append("file", resumeFile);
+    form.append("job_role", jobRole);
+    form.append("experience_level", selectedDifficulty);
+    form.append("interview_type", selectedType);
+
+    const headers = apiKey ? { "x-api-key": apiKey } : {};
+
+    try {
+      const res  = await fetch(`${API_URL}/upload-resume`, { method: "POST", headers, body: form });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      SESSION_ID = data.session_id;
+      WS_URL     = `ws://localhost:8000/ws/audio/${SESSION_ID}` + (apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "");
+
+      // Set badge
+      const badge = document.getElementById("session-badge");
+      const cfg = {
+        beginner:     { cls: "session-badge beginner",     label: "● Beginner" },
+        intermediate: { cls: "session-badge intermediate", label: "● Intermediate" },
+        expert:       { cls: "session-badge expert",       label: "● Expert" },
+      };
+      const c = cfg[selectedDifficulty] || cfg.beginner;
+      badge.className = c.cls; badge.textContent = c.label;
+
+      document.getElementById("setup-panel").style.display    = "none";
+      document.getElementById("interview-panel").style.display = "block";
+      connectWS();
+
+    } catch(err) {
+      setStatus("Error: " + err.message);
+      btn.disabled = false;
+    }
+  });
+
+  btnNext.addEventListener("click", () => {
+    if (ws?.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: "next_question" }));
+    btnNext.style.display = "none";
+  });
+
+  btnEnd.addEventListener("click", async () => {
+    if (isRecording) stopRecording();
+    voice.stop();
+    if (ws?.readyState === WebSocket.OPEN) { ws.onclose = null; ws.close(); }
+    [btnStart, btnStop, btnNext, btnEnd].forEach(b => b.style.display = "none");
+    setStatus("Generating your full report…", "ai");
+
+    try {
+      const apiKey  = document.getElementById("api-key-input").value;
+      const headers = apiKey ? { "x-api-key": apiKey } : {};
+      const res    = await fetch(`${API_URL}/generate-report/${SESSION_ID}`, { method: "POST", headers });
+      const report = await res.json();
+      displayReport(report);
+    } catch(err) {
+      setStatus("Error generating report: " + err.message);
+    }
+  });
+
+  btnPdf.addEventListener("click", async () => {
+    if (!SESSION_ID) return;
+    setStatus("Generating PDF…", "ai");
+    btnPdf.disabled = true;
+    try {
+      const apiKey  = document.getElementById("api-key-input").value;
+      const headers = apiKey ? { "x-api-key": apiKey } : {};
+      const res  = await fetch(`${API_URL}/generate-pdf/${SESSION_ID}`, { method: "POST", headers });
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement("a"), { href: url, download: `interview_report_${SESSION_ID.slice(0,8)}.pdf` });
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      setStatus("PDF downloaded ✅", "ready");
+    } catch(err) {
+      setStatus("PDF error: " + err.message);
+    } finally { btnPdf.disabled = false; }
+  });
+
+  async function handleComplete(report) {
+    voice.stop();
+    if (isRecording) stopRecording();
+    [btnEnd, btnStart, btnNext].forEach(b => b.style.display = "none");
+    await voice.speak("Congratulations! You have completed the interview. Your full report is now ready.");
+    if (report) displayReport(report);
+    openModal("complete");
+  }
+
+  function displayReport(report) {
+    const sec = document.getElementById("report-section");
+    sec.style.display = "block";
+    document.getElementById("report-body").textContent = JSON.stringify(report, null, 2);
+    btnPdf.style.display = "inline-flex";
+    setStatus("Interview complete — report ready below.", "ready");
+    sec.scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── MODALS ──
+  function openModal(id, msg) {
+    if (msg) document.getElementById("modal-" + id + "-text") && (document.getElementById("modal-" + id + "-text").textContent = msg);
+    document.getElementById("overlay-" + id).style.display = "block";
+    document.getElementById("modal-" + id).style.display = "block";
+    requestAnimationFrame(() => document.getElementById("modal-" + id).classList.add("open"));
+  }
+  function closeModal(id) {
+    document.getElementById("modal-" + id).classList.remove("open");
+    setTimeout(() => {
+      document.getElementById("modal-" + id).style.display   = "none";
+      document.getElementById("overlay-" + id).style.display = "none";
+    }, 250);
+  }
+
+  function pct(v) { return v != null ? Math.round(v * 100) + "%" : "—"; }
+
+  btnStart.addEventListener("click", startRecording);
+  btnStop.addEventListener("click",  stopRecording);
+</script>
+</body>
+</html>

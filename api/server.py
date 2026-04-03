@@ -4,7 +4,8 @@ load_dotenv()
 from configs.logger import setup_logging
 setup_logging(level="INFO")
 
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from collections import defaultdict
 import shutil
@@ -13,82 +14,75 @@ import uuid
 import time
 import asyncio
 import json
+import logging
+import datetime
+
+from services.pdf_generator import PDFReportGenerator
+from fastapi.responses import FileResponse
+from fastapi import BackgroundTasks
+import tempfile
 
 from interview_engine.interview_manager import InterviewManager
 from pipelines.evaluation_pipeline import SpeechEvaluationPipeline
 from configs.job_roles import list_roles
 from asr.realtime_buffer import RealtimeAudioBuffer
+from services.semantic_validator import is_relevant_answer
 
+logger = logging.getLogger("server")
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 speech_pipeline = SpeechEvaluationPipeline()
 sessions = {}
-
-# ✅ Track session creation time for auto-cleanup
 session_created_at = {}
-SESSION_TTL_SECONDS = 3600      # Sessions expire after 1 hour
+SESSION_TTL_SECONDS = 3600
 
 
-# ====================================================
-# ✅ P1: API KEY PROTECTION
-# ====================================================
-# Add this to your .env file:
-#   INTERVIEW_API_KEY=pick-any-long-random-string
-#
-# Your friend's frontend must send this header with every request:
-#   X-API-Key: <your key>
-#
-# /job-roles and /docs are left public intentionally.
-# ====================================================
+
+# ----------------------------------------------------
+# Auth
+# ----------------------------------------------------
 
 API_KEY = os.getenv("INTERVIEW_API_KEY", "")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 def verify_api_key(key: str = Depends(api_key_header)):
     if not API_KEY:
-        return          # If no key set in .env, skip check (local dev mode)
+        return
     if key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key. Send X-API-Key header.")
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
+# ----------------------------------------------------
+# Rate limiting
+# ----------------------------------------------------
 
-# ====================================================
-# ✅ P1: RATE LIMITING
-# ====================================================
-# Limits per IP:
-#   /upload-resume  → 5 requests per minute  (starting a new interview)
-#   /submit-answer  → 30 requests per minute (answering questions)
-#   /ws/*           → 10 connections per minute
-# ====================================================
-
-# Stores: { ip: { endpoint: [timestamp, ...] } }
 rate_limit_store: dict = defaultdict(lambda: defaultdict(list))
-
 RATE_LIMITS = {
-    "upload_resume":  (5,  60),     # 5 per 60 seconds
-    "submit_answer":  (30, 60),     # 30 per 60 seconds
-    "websocket":      (10, 60),     # 10 per 60 seconds
+    "upload_resume": (5,  60),
+    "submit_answer": (30, 60),
+    "websocket":     (10, 60),
 }
 
 def check_rate_limit(request: Request, endpoint: str):
     ip = request.client.host
     max_calls, window = RATE_LIMITS[endpoint]
     now = time.time()
-
-    # Keep only timestamps within the current window
     calls = rate_limit_store[ip][endpoint]
     rate_limit_store[ip][endpoint] = [t for t in calls if now - t < window]
-
     if len(rate_limit_store[ip][endpoint]) >= max_calls:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Rate limit exceeded. Max {max_calls} requests per {window}s for this endpoint."
-        )
-
+        raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Max {max_calls} per {window}s.")
     rate_limit_store[ip][endpoint].append(now)
 
-
 # ----------------------------------------------------
-# ✅ Session cleanup — runs silently on every request
+# Session cleanup
 # ----------------------------------------------------
 
 def cleanup_expired_sessions():
@@ -97,11 +91,49 @@ def cleanup_expired_sessions():
     for sid in expired:
         sessions.pop(sid, None)
         session_created_at.pop(sid, None)
-        print(f"🧹 Expired session removed: {sid}")
+        logger.info(f"Expired session removed: {sid}")
+
+# ----------------------------------------------------
+# Helper — build response dict from result + analysis
+# ----------------------------------------------------
+
+def build_answer_response(transcript, result, analysis_result, manager):
+    """Shared response builder for REST and WebSocket."""
+
+    evaluation = result.get("evaluation", {})
+
+    base = {
+        "transcript":         transcript,
+        "next_question":      result["content"],
+        "interview_complete": result["type"] == "end",
+
+        # Fluency
+        "fluency_score":      analysis_result.get("fluency_score", 0),
+        "speech_rate":        analysis_result.get("speech_rate", 0),
+        "pause_count":        analysis_result.get("pause_count", 0),
+        "filler_count":       analysis_result.get("filler_count", 0),
+        "grammar_errors":     analysis_result.get("grammar_errors", 0),
+        "lexical_diversity":  analysis_result.get("lexical_diversity", 0),
+
+        # ✅ Content evaluation
+        "content_score":      evaluation.get("final_score", 0),
+        "correctness":        evaluation.get("correctness", 0),
+        "depth":              evaluation.get("depth", 0),
+        "clarity":            evaluation.get("clarity", 0),
+        "consistency":        evaluation.get("consistency", 0),
+        "confidence_level":   evaluation.get("confidence", 0.3),
+        "reasoning":          evaluation.get("feedback", ""),
+
+        "job_role":           manager.job_role.get("title", "") if manager.job_role else "",
+        "average_score":      round(manager.average_score, 3),
+        "questions_asked":    len(manager.questions_asked),
+    }
+
+    return base
 
 
 # ----------------------------------------------------
-# Job roles
+# Endpoints
 # ----------------------------------------------------
 
 @app.get("/job-roles")
@@ -109,25 +141,24 @@ def get_job_roles():
     return {"roles": list_roles()}
 
 
-# ----------------------------------------------------
-# Upload resume + start interview
-# ----------------------------------------------------
-
 @app.post("/upload-resume")
 async def upload_resume(
     request: Request,
     file: UploadFile = File(...),
     job_role: str = Form(default="software_engineer"),
+    experience_level: str = Form(default="beginner"),
+    interview_type: str = Form(default="full"),
     _: str = Depends(verify_api_key)
 ):
-    print("Incoming job_role from request:", job_role)
-    
     if not job_role or len(job_role.strip()) < 3:
         raise HTTPException(status_code=400, detail="Invalid job role")
+
+    logger.info(f"Form received: job_role={job_role} level={experience_level} type={interview_type}")
 
     check_rate_limit(request, "upload_resume")
     cleanup_expired_sessions()
 
+    path = None
     try:
         path = f"temp_{file.filename}"
         with open(path, "wb") as buffer:
@@ -135,7 +166,7 @@ async def upload_resume(
 
         session_id = str(uuid.uuid4())
         manager = InterviewManager()
-        question = await asyncio.to_thread(manager.start_interview, path, job_role)
+        question = await asyncio.to_thread(manager.start_interview, path, job_role, experience_level, interview_type)
 
         sessions[session_id] = {
             "session_id": session_id,
@@ -147,22 +178,18 @@ async def upload_resume(
 
         return {
             "session_id": session_id,
-            "question": question,
-            "job_role": sessions[session_id]["job_role"]
+            "question":   question,
+            "job_role":   sessions[session_id]["job_role"]
         }
 
     except Exception as e:
+        logger.error(f"upload_resume error: {e}")
         return {"error": str(e)}
 
     finally:
-        # ✅ Always clean up resume temp file
-        if "path" in locals() and os.path.exists(path):
+        if path and os.path.exists(path):
             os.remove(path)
 
-
-# ----------------------------------------------------
-# Submit answer (REST — keep for testing)
-# ----------------------------------------------------
 
 @app.post("/submit-answer")
 async def submit_answer(
@@ -181,14 +208,12 @@ async def submit_answer(
         if session_id not in sessions:
             return {"error": "Invalid session_id"}
 
-        session = sessions[session_id]
-        manager = session["manager"]
+        manager = sessions[session_id]["manager"]
 
-        # ✅ Block further answers if interview already finished
         if manager.is_finished:
             return {
                 "interview_complete": True,
-                "message": "This interview has already ended. Call /get-report to retrieve results."
+                "message": "Interview already ended. Call /get-report to retrieve results."
             }
 
         if not file.filename.endswith((".wav", ".mp3", ".flac", ".ogg")):
@@ -198,178 +223,193 @@ async def submit_answer(
         with open(path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        print("=" * 50)
-        print("🎤 STAGE 1: Speech-to-Text (Groq Cloud)...")
-        stt_start = time.time()
+        # Stage 1: STT
         text, timestamps = await asyncio.to_thread(speech_pipeline.transcribe, path)
-        print(f"⏱  STT Time: {time.time() - stt_start:.2f}s")
-
         transcript = text if text else ""
+
         if not transcript.strip():
+            return {"transcript": "", "fluency_score": 0, "next_question": "Could you please repeat your answer?"}
+            
+        # SEMANTIC VALIDATION
+        current_question = manager.questions_asked[manager.current_question_index] if manager.current_question_index < len(manager.questions_asked) else "Tell me about yourself."
+        
+        validation_data = await asyncio.to_thread(is_relevant_answer, current_question, transcript)
+        verdict = validation_data.get("verdict", "RELEVANT")
+        
+        print("Heuristic + LLM validation result:", verdict)
+        
+        if verdict == "IRRELEVANT":
+            print("🚫 TERMINATING INTERVIEW DUE TO INVALID ANSWER")
+            manager.is_finished = True
+            manager.end_reason = "irrelevant_answer"
+            report = manager.generate_report()
+            
             return {
-                "transcript": "",
-                "fluency_score": 0,
-                "next_question": "Could you please repeat your answer?"
+                "type": "interview_terminated",
+                "message": "This is your final warning. The interview has been terminated due to inappropriate or irrelevant response.",
+                "reason": "irrelevant_answer",
+                "interview_complete": True,
+                "report": report
             }
+        
+        elif verdict == "PARTIALLY_RELEVANT":
+            print("⚠️ PARTIALLY RELEVANT ANSWER DETECTED")
+            # We allow it through, but it will be evaluated poorly by the pipeline.
 
-        print("🚀 STAGE 2: Running Groq + Analysis in PARALLEL...")
-        analysis_start = time.time()
-
+        # Stage 2: Fluency analysis + answer evaluation in parallel
         analysis_task = asyncio.to_thread(speech_pipeline.analyze, path, text, timestamps)
-
-        # Run analysis first to get fluency metrics for weak area detection
         analysis_result = await analysis_task
 
-        # ✅ Pass fluency metrics into process_answer for weak area detection
-        result = await asyncio.to_thread(
-            manager.process_answer, transcript, analysis_result
-        )
+        try:
+            result = await asyncio.to_thread(manager.process_answer, transcript, analysis_result)
+        except Exception as e:
+            logger.error(f"Evaluation step failed: {e}")
+            result = {
+                "type": "continue",
+                "content": "I apologize, there was an error processing your answer. Let's move to the next question.",
+                "evaluation": {"final_score": 0.0, "confidence_level": "low"}
+            }
 
-        print(f"⏱  Analysis Time: {time.time() - analysis_start:.2f}s")
-        print(f"✅ TOTAL Response Time: {time.time() - total_start:.2f}s")
-        print("=" * 50)
+        logger.info(f"Total response time: {time.time() - total_start:.2f}s")
 
-        response = {
-            "transcript": transcript,
-            "fluency_score": analysis_result.get("fluency_score", 0),
-            "speech_rate": analysis_result.get("speech_rate", 0),
-            "pause_count": analysis_result.get("pause_count", 0),
-            "filler_count": analysis_result.get("filler_count", 0),
-            "grammar_errors": analysis_result.get("grammar_errors", 0),
-            "lexical_diversity": analysis_result.get("lexical_diversity", 0),
-            "job_role": manager.job_role.get("title", "") if manager.job_role else ""
-        }
-
-        # ✅ Wire in end logic
-        if result["type"] == "end":
-            response["interview_complete"] = True
-            response["next_question"] = result["content"]
-        else:
-            response["interview_complete"] = False
-            response["next_question"] = result["content"]
-
-        return response
+        return build_answer_response(transcript, result, analysis_result, manager)
 
     except Exception as e:
-        print(f"❌ Server error: {e}")
+        logger.error(f"submit_answer error: {e}")
         return {"error": str(e)}
 
     finally:
-        # ✅ Always clean up audio temp file
         if path and os.path.exists(path):
             os.remove(path)
 
 
-# ----------------------------------------------------
-# ✅ NEW: Final report endpoint
-# ----------------------------------------------------
-
 @app.get("/get-report/{session_id}")
 async def get_report(session_id: str, _: str = Depends(verify_api_key)):
-    """
-    Call this after interview_complete=True to get the full report.
-    Can also be called mid-interview to get a partial report.
-    """
-
     if session_id not in sessions:
         return {"error": "Invalid session_id or session has expired"}
+    try:
+        return sessions[session_id]["manager"].generate_report()
+    except Exception as e:
+        logger.error(f"get_report error: {e}")
+        return {"error": str(e)}
 
-    session = sessions[session_id]
-    manager = session["manager"]
 
+@app.post("/generate-report/{session_id}")
+async def generate_report_endpoint(session_id: str):
+    if session_id not in sessions:
+        return {"error": "Invalid session_id or session has expired"}
+    manager = sessions[session_id]["manager"]
+    manager.is_finished = True
+    manager.end_reason = "manual"
     try:
         report = manager.generate_report()
         return report
-
     except Exception as e:
-        print(f"❌ Report generation error: {e}")
+        logger.error(f"generate-report error: {e}")
         return {"error": str(e)}
 
+@app.post("/generate-pdf/{session_id}")
+async def generate_pdf_endpoint(session_id: str, background_tasks: BackgroundTasks, _: str = Depends(verify_api_key)):
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Invalid session_id or session has expired")
+    
+    manager = sessions[session_id]["manager"]
+    report = manager.generate_report()
+    
+    job_role = report.get("session_summary", {}).get("job_role", "candidate").replace(" ", "_").lower()
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
+    filename = f"interview_report_{job_role}_{date_str}.pdf"
+    
+    # Create temp file
+    fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
+    
+    # Generate PDF
+    generator = PDFReportGenerator()
+    generator.generate(report, temp_path)
+    
+    # Delete after sending
+    background_tasks.add_task(os.remove, temp_path)
+    
+    return FileResponse(
+        path=temp_path,
+        filename=filename,
+        media_type="application/pdf"
+    )
 
-# ----------------------------------------------------
-# ✅ NEW: Manual end interview endpoint
-# ----------------------------------------------------
 
 @app.post("/end-interview/{session_id}")
 async def end_interview(session_id: str, _: str = Depends(verify_api_key)):
-    """
-    Lets the frontend manually end the interview early.
-    Returns the final report immediately.
-    """
-
     if session_id not in sessions:
         return {"error": "Invalid session_id"}
-
-    session = sessions[session_id]
-    manager = session["manager"]
+    manager = sessions[session_id]["manager"]
     manager.is_finished = True
     manager.end_reason = "manual"
-
     try:
-        report = manager.generate_report()
-        return {
-            "message": "Interview ended manually.",
-            "report": report
-        }
+        return {"message": "Interview ended manually.", "report": manager.generate_report()}
     except Exception as e:
         return {"error": str(e)}
 
 
-# ====================================================
-# WebSocket — real-time streaming
-# ====================================================
-#
-# FRONTEND INTEGRATION GUIDE:
-#
-# 1. POST /upload-resume → get session_id + first question
-# 2. Connect: ws://yourserver/ws/{session_id}
-# 3. Send raw audio chunks as binary (16kHz mono 16-bit PCM) every ~250ms
-# 4. Server auto-detects 1.5s silence and processes automatically
-#    OR send: { "event": "end_of_speech" } to trigger manually
-# 5. Server sends two messages back:
-#    { "event": "transcript", "transcript": "..." }         ← immediate
-#    { "event": "result", "next_question": "...", ... }     ← after LLM
-#    { "event": "interview_complete", "report": {...} }     ← when done
-# 6. On "interview_complete", show the report to the user
-# 7. To end early: { "event": "end_interview" }
-#
-# ====================================================
+# ----------------------------------------------------
+# WebSocket
+# ✅ Accepts api_key as query param (browsers can't send headers over WS)
+# ----------------------------------------------------
 
-@app.websocket("/ws/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str):
+@app.websocket("/ws/audio/{session_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    session_id: str
+):
+    api_key = websocket.query_params.get("api_key")
+
+    print("API key received")
+
+    # Auth
+    if API_KEY and api_key != API_KEY:
+        try:
+            await websocket.close(code=1008)
+        except:
+            pass
+        return
 
     await websocket.accept()
-    print(f"🔌 WebSocket connected: {session_id}")
+    print(f"✅ CONNECTED: {session_id}")
+    print("✅ Ready to receive messages (no handshake required)")
 
-    # ✅ Rate limit WebSocket connections by IP
-    try:
-        check_rate_limit(websocket, "websocket")
-    except HTTPException as e:
-        await websocket.send_text(json.dumps({"event": "error", "message": e.detail}))
-        await websocket.close()
-        return
+    # 🔥 DEBUG (VERY IMPORTANT)
+    print("🔍 Active sessions:", list(sessions.keys()))
+    print("🔍 Incoming session:", session_id)
 
     if session_id not in sessions:
         await websocket.send_text(json.dumps({
             "event": "error",
-            "message": "Invalid session_id. Call /upload-resume first."
+            "message": "Invalid session_id."
         }))
-        await websocket.close()
-        return
+        print("❌ Invalid session_id — keeping socket open for debug")
+        return  # 🔥 DO NOT CLOSE (prevents crash)
 
-    session = sessions[session_id]
-    manager = session["manager"]
+    manager = sessions[session_id]["manager"]
     buffer = RealtimeAudioBuffer(sample_rate=16000)
+    logger.info(f"WebSocket connected: {session_id}")
 
-    async def process_buffered_audio():
+    # Send first question
+    initial_question = (
+        manager.questions_asked[0]
+        if manager.questions_asked
+        else "Tell me about yourself."
+    )
 
-        audio_path = f"temp_ws_{session_id}.wav"
+    await websocket.send_text(json.dumps({
+        "type": "question",
+        "text": initial_question
+    }))
 
+    # --------------------------------------------------
+    # AUDIO PROCESSING TASK
+    # --------------------------------------------------
+    async def process_audio_task(audio_path: str):
         try:
-            buffer.save_to_wav(audio_path)
-            total_start = time.time()
-
-            # STT
             text, timestamps = await asyncio.to_thread(
                 speech_pipeline.transcribe, audio_path
             )
@@ -377,106 +417,161 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             if not transcript.strip():
                 await websocket.send_text(json.dumps({
-                    "event": "result",
+                    "type": "result",
                     "transcript": "",
                     "next_question": "Could you please repeat your answer?",
-                    "interview_complete": False,
-                    "fluency_score": 0,
-                    "speech_rate": 0,
-                    "pause_count": 0,
-                    "filler_count": 0,
-                    "grammar_errors": 0,
-                    "lexical_diversity": 0
+                    "interview_complete": False
                 }))
-                buffer.clear()
                 return
 
-            # Send transcript immediately
+            print(f"📝 Transcript: {transcript}")
+
             await websocket.send_text(json.dumps({
-                "event": "transcript",
-                "transcript": transcript
+                "type": "transcript",
+                "text": transcript
             }))
 
-            # Run analysis
+            # Validation
+            current_question = (
+                manager.questions_asked[manager.current_question_index]
+                if manager.current_question_index < len(manager.questions_asked)
+                else "Tell me about yourself."
+            )
+
+            validation_data = await asyncio.to_thread(
+                is_relevant_answer,
+                current_question,
+                transcript
+            )
+
+            verdict = validation_data.get("verdict", "RELEVANT")
+            print("Validation:", verdict)
+
+            if verdict == "IRRELEVANT":
+                manager.is_finished = True
+                manager.end_reason = "irrelevant_answer"
+
+                await websocket.send_text(json.dumps({
+                    "type": "interview_terminated",
+                    "message": "Interview terminated due to irrelevant answer."
+                }))
+
+                report = manager.generate_report()
+
+                await websocket.send_text(json.dumps({
+                    "type": "final_report",
+                    "data": report
+                }))
+                return
+
             analysis_result = await asyncio.to_thread(
-                speech_pipeline.analyze, audio_path, text, timestamps
+                speech_pipeline.analyze,
+                audio_path,
+                text,
+                timestamps
             )
 
-            # Process answer with fluency metrics
-            result = await asyncio.to_thread(
-                manager.process_answer, transcript, analysis_result
-            )
+            try:
+                result = await asyncio.to_thread(
+                    manager.process_answer,
+                    transcript,
+                    analysis_result
+                )
+            except Exception as e:
+                logger.error(f"Evaluation failed: {e}")
+                result = {
+                    "type": "continue",
+                    "content": "Error processing answer. Moving on.",
+                    "evaluation": {"final_score": 0.0}
+                }
 
-            print(f"✅ WebSocket Response Time: {time.time() - total_start:.2f}s")
-
-            # ✅ Handle end vs next question
             if result["type"] == "end":
                 report = manager.generate_report()
                 await websocket.send_text(json.dumps({
-                    "event": "interview_complete",
+                    "type": "interview_complete",
                     "message": result["content"],
                     "report": report
                 }))
             else:
+                payload = build_answer_response(
+                    transcript, result, analysis_result, manager
+                )
                 await websocket.send_text(json.dumps({
-                    "event": "result",
-                    "transcript": transcript,
-                    "next_question": result["content"],
-                    "interview_complete": False,
-                    "fluency_score": analysis_result.get("fluency_score", 0),
-                    "speech_rate": analysis_result.get("speech_rate", 0),
-                    "pause_count": analysis_result.get("pause_count", 0),
-                    "filler_count": analysis_result.get("filler_count", 0),
-                    "grammar_errors": analysis_result.get("grammar_errors", 0),
-                    "lexical_diversity": analysis_result.get("lexical_diversity", 0)
+                "type": "transcript",
+                "text": transcript
                 }))
+                await websocket.send_text(json.dumps({
+    "type": "evaluation",
+    "feedback": payload.get("reasoning", ""),
+    "content_score": payload.get("content_score", 0),
+    "fluency_score": payload.get("fluency_score", 0),
+    "avg_score": payload.get("average_score", 0)
+                }))
+                await websocket.send_text(json.dumps({
+    "type": "question",
+    "text": payload.get("next_question", "Let's continue.")
+}))
+
 
         except Exception as e:
-            print(f"❌ WebSocket processing error: {e}")
-            await websocket.send_text(json.dumps({
-                "event": "error",
-                "message": str(e)
-            }))
-
+            logger.error(f"Processing error: {e}")
         finally:
-            buffer.clear()
             if os.path.exists(audio_path):
                 os.remove(audio_path)
 
+    # --------------------------------------------------
+    # MAIN LOOP
+    # --------------------------------------------------
     try:
         while True:
-            message = await websocket.receive()
+            try:
+                message = await websocket.receive()
+            except WebSocketDisconnect:
+                print("❌ Client disconnected")
+                break
+            except Exception as e:
+                print("⚠️ Receive error:", e)
+                break
+
+            print("📩 RAW MESSAGE:", message)
 
             if "bytes" in message and message["bytes"]:
-                buffer.add_chunk(message["bytes"])
+                raw = message["bytes"]
+                buffer.add_chunk(raw)
+
                 if buffer.is_silent_long_enough():
-                    print("🔇 Silence detected — auto-processing...")
-                    await process_buffered_audio()
+                    if buffer.chunks:
+                        audio_path = f"temp_ws_{uuid.uuid4().hex[:6]}.wav"
+                        buffer.save_to_wav(audio_path)
+                        asyncio.create_task(process_audio_task(audio_path))
+                    buffer.clear()
 
             elif "text" in message and message["text"]:
                 try:
                     event = json.loads(message["text"])
-                except json.JSONDecodeError:
+                except:
                     continue
 
-                if event.get("event") == "end_of_speech":
-                    print("🎤 End of speech signal received")
-                    await process_buffered_audio()
+                if event.get("type") == "end_of_speech":
+                    if buffer.chunks:
+                        audio_path = f"temp_ws_{uuid.uuid4().hex[:6]}.wav"
+                        buffer.save_to_wav(audio_path)
+                        asyncio.create_task(process_audio_task(audio_path))
+                    buffer.clear()
 
-                elif event.get("event") == "end_interview":
+                elif event.get("type") == "end_interview":
                     manager.is_finished = True
                     manager.end_reason = "manual"
+
                     report = manager.generate_report()
+
                     await websocket.send_text(json.dumps({
-                        "event": "interview_complete",
-                        "message": "Interview ended manually.",
+                        "type": "interview_complete",
+                        "message": "Interview ended.",
                         "report": report
                     }))
                     break
 
-    except WebSocketDisconnect:
-        print(f"🔌 WebSocket disconnected: {session_id}")
-
     finally:
         buffer.clear()
-        print(f"🧹 Cleaned up: {session_id}")
+        logger.info(f"🧹 Cleaned up session: {session_id}")

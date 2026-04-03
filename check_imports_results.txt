@@ -1,0 +1,13 @@
+2026-03-28 01:18:40 | INFO     | app                       | Logging initialised — level: INFO, file: logs\interview_engine.log
+C:\Python312\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.2) or chardet (6.0.0.post1)/charset_normalizer (3.4.4) doesn't match a supported version!
+  warnings.warn(
+ERROR: api.server -> ModuleNotFoundError: No module named 'librosa'
+OK: interview_engine.interview_manager
+OK: question_engine.followup_generator
+OK: resume_parser.skill_extractor
+ERROR: pipelines.evaluation_pipeline -> ModuleNotFoundError: No module named 'librosa'
+OK: asr.whisper_stream
+OK: services.answer_evaluator
+OK: services.semantic_validator
+OK: configs.job_roles
+OK: configs.logger

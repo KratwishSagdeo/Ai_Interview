@@ -33,6 +33,9 @@ class InterviewState:
         # Weak areas detected during interview
         self.weak_areas = []
 
+        # Candidate experience level (beginner, intermediate, expert)
+        self.experience_level = "beginner"
+
 
     # ----------------------------------------------------
     # Add new question

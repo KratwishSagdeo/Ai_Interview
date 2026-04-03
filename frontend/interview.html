@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Platform</title>
+    <style>
+        :root {
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --success: #16A34A;
+            --warning: #D97706;
+            --danger: #DC2626;
+            --background: #F8FAFC;
+            --card: #FFFFFF;
+            --text-main: #1E293B;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+            --ring: rgba(37, 99, 235, 0.5);
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Utility Classes */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .text-muted { color: var(--text-muted); }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        
+        /* Cards & Containers */
+        .card {
+            background-color: var(--card);
+            border-radius: var(--radius-xl);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 2rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            font-family: var(--font-family);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:not(:disabled):hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        .btn-outline:not(:disabled):hover {
+            background-color: var(--background);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        /* Forms & Inputs */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--ring);
+        }
+
+        /* Setup Screen - File Drop */
+        .file-drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            background-color: var(--background);
+            transition: all 0.2s;
+        }
+
+        .file-drop-zone.dragover {
+            border-color: var(--primary);
+            background-color: rgba(37, 99, 235, 0.05);
+        }
+
+        .file-drop-zone:hover {
+            border-color: var(--primary);
+        }
+
+        .file-input { display: none; }
+
+        /* Selectable Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .selectable-card {
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--card);
+            text-align: left;
+        }
+
+        .selectable-card:hover {
+            border-color: var(--primary);
+        }
+
+        .selectable-card.selected {
+            border-color: var(--primary);
+            background-color: rgba(37, 99, 235, 0.05);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .selectable-card-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .selectable-card-desc {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Interview Screen */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        .badges {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background-color: var(--background);
+            border: 1px solid var(--border);
+        }
+
+        .timer {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .question-display {
+            font-size: 1.75rem;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 2rem;
+            min-height: 100px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .ai-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--primary);
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            height: 24px;
+        }
+
+        .pulsing-dots {
+            display: flex;
+            gap: 4px;
+        }
+        .pulsing-dots span {
+            width: 6px;
+            height: 6px;
+            background-color: currentColor;
+            border-radius: 50%;
+            animation: pulse 1.4s infinite ease-in-out both;
+        }
+        .pulsing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .pulsing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes pulse { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        .recording-box {
+            background-color: var(--background);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        .recording-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .recording-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); } }
+
+        .transcript-box {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            min-height: 60px;
+            padding: 1rem;
+            background: white;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+
+        .scores-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .score-card {
+            background: var(--card);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .score-card-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .score-card-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Colors for scores */
+        .color-green { color: var(--success); }
+        .color-orange { color: var(--warning); }
+        .color-red { color: var(--danger); }
+        .bg-green { background-color: var(--success) !important; }
+        .bg-orange { background-color: var(--warning) !important; }
+        .bg-red { background-color: var(--danger) !important; }
+        .text-green { color: var(--success) !important; }
+        .text-orange { color: var(--warning) !important; }
+        .text-red { color: var(--danger) !important; }
+
+        /* Report Screen */
+        .report-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .circular-progress {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem auto;
+            position: relative;
+            background: conic-gradient(var(--primary) calc(var(--value) * 1%), var(--border) 0);
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .circular-progress::before {
+            content: "";
+            position: absolute;
+            inset: 12px;
+            background-color: var(--card);
+            border-radius: 50%;
+        }
+        .circular-progress span { position: relative; z-index: 1; }
+
+        .band-badge {
+            display: inline-block;
+            padding: 0.5rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 1.125rem;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--background);
+        }
+
+        .bar-chart {
+            margin-bottom: 1.5rem;
+        }
+        .bar-chart-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .bar-chart-track {
+            height: 12px;
+            background-color: var(--background);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .bar-chart-fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 1s ease-out;
+            width: 0%;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--background);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            text-align: center;
+        }
+
+        .stat-card-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .pill-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .pill {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .pill.good { background-color: rgba(22, 163, 74, 0.1); color: var(--success); }
+        .pill.bad { background-color: rgba(220, 38, 38, 0.1); color: var(--danger); }
+
+        .feedback-list {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .feedback-list li {
+            margin-bottom: 0.75rem;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .feedback-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-size: 1.5rem;
+            line-height: 1;
+            top: -2px;
+        }
+        .feedback-list li.positive::before { color: var(--success); }
+        .feedback-list li.improvement::before { color: var(--warning); }
+
+        .accordion {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .accordion-item {
+            border-bottom: 1px solid var(--border);
+        }
+        .accordion-item:last-child { border-bottom: none; }
+
+        .accordion-header {
+            padding: 1.25rem;
+            background-color: var(--background);
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .accordion-header:hover { background-color: #F1F5F9; }
+
+        .accordion-content {
+            padding: 1.25rem;
+            background-color: white;
+            display: none;
+            color: var(--text-muted);
+        }
+
+        .accordion-item.active .accordion-content { display: block; }
+        .accordion-item.active .accordion-icon { transform: rotate(180deg); }
+
+        .accordion-icon {
+            transition: transform 0.2s;
+        }
+
+        /* Modal / Toasts */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 60;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-md);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            animation: slideIn 0.3s ease-out;
+            max-width: 300px;
+        }
+        .toast.error { background-color: var(--danger); }
+        .toast.warning { background-color: var(--warning); }
+        .toast.success { background-color: var(--success); }
+
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <!-- Toast Messages -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Modal for Invalid Answers / Termination -->
+    <div id="alertModal" class="modal-overlay">
+        <div class="card" style="max-width: 400px; text-align: center;">
+            <div id="modalIcon" style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <h3 id="modalTitle" class="mb-4">Alert</h3>
+            <p id="modalMessage" class="text-muted mb-6"></p>
+            <button id="modalBtn" class="btn btn-primary" style="width: 100%;">Understood</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 1: SETUP -->
+    <!-- ========================================== -->
+    <div id="screenSetup">
+        <div class="text-center mb-8">
+            <h1 class="font-bold" style="font-size: 2.5rem; margin-bottom: 0.5rem;">AI Interview Platform</h1>
+            <p class="text-muted">Configure your intelligent interview session</p>
+        </div>
+
+        <div class="card">
+            <form id="setupForm" onsubmit="event.preventDefault(); startSetup();">
+                
+                <!-- Resume Upload -->
+                <div class="form-group">
+                    <label class="form-label">Upload Resume (PDF format, required)</label>
+                    <div id="dropZone" class="file-drop-zone">
+                        <div style="font-size: 2rem; margin-bottom: 1rem; color: var(--text-muted);">📄</div>
+                        <p class="mb-2">Drag and drop your PDF resume here, or click to browse</p>
+                        <p id="fileNameDisplay" class="text-primary font-semibold hidden"></p>
+                    </div>
+                    <input type="file" id="resumeFile" class="file-input" accept="application/pdf" required>
+                </div>
+
+                <!-- Job Role -->
+                <div class="form-group">
+                    <label class="form-label" for="jobRole">Target Role</label>
+                    <select id="jobRole" class="form-control" required>
+                        <option value="" disabled selected>Select a role...</option>
+                        <option value="software_engineer">Software Engineer</option>
+                        <option value="data_scientist">Data Scientist</option>
+                        <option value="ml_engineer">ML Engineer</option>
+                        <option value="cybersecurity_analyst">Cybersecurity Analyst</option>
+                        <option value="frontend_developer">Frontend Developer</option>
+                        <option value="devops_engineer">DevOps Engineer</option>
+                        <option value="android_developer">Android Developer</option>
+                        <option value="backend_developer">Backend Developer</option>
+                    </select>
+                </div>
+
+                <!-- Interview Type -->
+                <div class="form-group">
+                    <label class="form-label">Interview Type</label>
+                    <div class="card-grid" id="typeCards">
+                        <div class="selectable-card active selected" data-value="full" onclick="selectCard('typeCards', this)">
+                            <div class="selectable-card-title">Full Interview</div>
+                            <div class="selectable-card-desc">Comprehensive interview covering all aspects (Intro, Resume, Projects, Technical, HR)</div>
+                        </div>
+                        <div class="selectable-card" data-value="technical" onclick="selectCard('typeCards', this)">
+                            <div class="selectable-card-title">Technical Only</div>
+                            <div class="selectable-card-desc">Focused exclusively on role-specific technical skills and coding aspects</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="interviewType" value="full">
+                </div>
+
+                <!-- Experience Level -->
+                <div class="form-group">
+                    <label class="form-label">Difficulty / Experience Level</label>
+                    <div class="card-grid" id="levelCards">
+                        <div class="selectable-card" data-value="beginner" onclick="selectCard('levelCards', this)">
+                            <div class="selectable-card-title">Beginner</div>
+                            <div class="selectable-card-desc">Final year student / Fresh graduate</div>
+                        </div>
+                        <div class="selectable-card active selected" data-value="intermediate" onclick="selectCard('levelCards', this)">
+                            <div class="selectable-card-title">Intermediate</div>
+                            <div class="selectable-card-desc">1–5 years experience</div>
+                        </div>
+                        <div class="selectable-card" data-value="expert" onclick="selectCard('levelCards', this)">
+                            <div class="selectable-card-title">Expert</div>
+                            <div class="selectable-card-desc">5+ years experience</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="experienceLevel" value="intermediate">
+                </div>
+
+                <!-- API Key -->
+                <div class="form-group mb-8">
+                    <label class="form-label" for="apiKey">API Key (Optional, if required by server)</label>
+                    <input type="password" id="apiKey" class="form-control" placeholder="Enter API Key...">
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" id="startBtn" class="btn btn-primary" style="font-size: 1.125rem; padding: 1rem 3rem;">
+                        <span id="startBtnText">Start Interview</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 2: INTERVIEW -->
+    <!-- ========================================== -->
+    <div id="screenInterview" class="hidden">
+        
+        <div class="top-bar">
+            <div class="badges">
+                <span class="badge" id="badgeRole">Software Engineer</span>
+                <span class="badge" id="badgeType">Full Interview</span>
+                <span class="badge" id="badgeLevel">Intermediate</span>
+            </div>
+            <div class="timer" id="interviewTimer">00:00</div>
+        </div>
+
+        <div class="card mb-6">
+            <div class="text-muted font-semibold mb-2" id="questionNumber">Question 1</div>
+            <div class="question-display" id="questionText">Loading first question...</div>
+            
+            <div class="ai-status hidden" id="aiStatus">
+                <span>🤖 AI Speaking</span>
+                <div class="pulsing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+            <button id="toggleMuteBtn" class="btn btn-outline" style="padding: 0.25rem 0.75rem; font-size: 0.875rem;">Mute AI</button>
+        </div>
+
+        <div class="recording-box">
+            <div class="recording-controls">
+                <button id="recordStartBtn" class="btn btn-primary" disabled>
+                    🎙️ Start Speaking
+                </button>
+                <button id="recordStopBtn" class="btn btn-danger hidden">
+                    <div class="recording-indicator"></div> Stop speaking
+                </button>
+                <div id="audioStatus" class="text-muted hidden">Recording in progress...</div>
+            </div>
+
+            <div class="transcript-box" id="liveTranscript">
+                Your transcript will appear here as you speak...
+            </div>
+        </div>
+
+        <div id="scoresPanel" class="scores-panel hidden">
+            <div class="score-card">
+                <div class="score-card-title">Content Score</div>
+                <div class="score-card-value" id="scoreContent">-</div>
+            </div>
+            <div class="score-card">
+                <div class="score-card-title">Fluency</div>
+                <div class="score-card-value" id="scoreFluency">-</div>
+            </div>
+            <div class="score-card">
+                <div class="score-card-title">Avg Score</div>
+                <div class="score-card-value" id="scoreAvg">-</div>
+            </div>
+        </div>
+
+        <div class="text-center mt-6 hidden" id="nextActionContainer">
+            <button id="nextQuestionBtn" class="btn btn-primary" style="font-size: 1.125rem;">Next Question →</button>
+        </div>
+
+        <div class="text-center" style="margin-top: 3rem;">
+            <button id="endInterviewBtn" class="btn btn-outline text-danger">End Interview Early</button>
+        </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SCREEN 3: REPORT -->
+    <!-- ========================================== -->
+    <div id="screenReport" class="hidden">
+        
+        <div class="card mb-6">
+            <div class="report-header">
+                <h1 class="mb-2">Interview Evaluation Report</h1>
+                <div class="text-muted mb-6" id="reportSubtitle">Software Engineer • Intermediate • Technical</div>
+                
+                <div class="circular-progress" id="reportOverallCircle" style="--value: 0;">
+                    <span id="reportOverallText">0%</span>
+                </div>
+                
+                <div class="band-badge bg-green" id="reportBand">Strong</div>
+            </div>
+
+            <div class="section-title">Score Breakdown</div>
+            
+            <div class="bar-chart">
+                <div class="bar-chart-label">
+                    <span>Content & Relevance</span>
+                    <span id="reportScoreContentTxt">0%</span>
+                </div>
+                <div class="bar-chart-track">
+                    <div class="bar-chart-fill bg-primary" id="reportScoreContentFill"></div>
+                </div>
+            </div>
+
+            <div class="bar-chart mb-8">
+                <div class="bar-chart-label">
+                    <span>Communication & Fluency</span>
+                    <span id="reportScoreFluencyTxt">0%</span>
+                </div>
+                <div class="bar-chart-track">
+                    <div class="bar-chart-fill bg-primary" id="reportScoreFluencyFill"></div>
+                </div>
+            </div>
+
+            <div class="section-title">Speech Metrics</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-icon">⚡</div>
+                    <div class="stat-card-value" id="reportWPM">0</div>
+                    <div class="stat-card-label">Speech Rate (WPM)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon">⏸️</div>
+                    <div class="stat-card-value" id="reportPauses">0</div>
+                    <div class="stat-card-label">Pauses</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon">🗣️</div>
+                    <div class="stat-card-value" id="reportFillers">0</div>
+                    <div class="stat-card-label">Filler Words</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon">📚</div>
+                    <div class="stat-card-value" id="reportVocab">0</div>
+                    <div class="stat-card-label">Vocab Diversity</div>
+                </div>
+            </div>
+
+            <div class="section-title">Skills Analysis</div>
+            <div class="mb-4">
+                <div class="font-semibold mb-2">Capabilities Detected:</div>
+                <div class="pill-list" id="reportSkills"></div>
+            </div>
+            <div class="mb-8">
+                <div class="font-semibold mb-2">Areas for Improvement:</div>
+                <div class="pill-list" id="reportWeaknesses"></div>
+            </div>
+
+            <div class="section-title">AI Feedback</div>
+            <ul class="feedback-list" id="reportFeedback"></ul>
+
+            <div class="section-title mt-8">Q&A Log</div>
+            <div class="accordion" id="reportQALog"></div>
+
+        </div>
+
+        <div class="text-center" style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 2rem;">
+            <button onclick="downloadPDF()" class="btn btn-primary" id="btnDownloadPdf">Download PDF Report</button>
+            <button onclick="resetApp()" class="btn btn-outline">Start New Interview</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    // ==========================================
+    // CONFIGURATION & STATE
+    // ==========================================
+    const API_URL = "http://localhost:8000";
+    const WS_BASE = "ws://localhost:8000";
+
+    let state = {
+        sessionId: null,
+        apiKey: "",
+        ws: null,
+        resumeFile: null,
+        audioContext: null,
+        audioStream: null,
+        audioProcessor: null,
+        questionCount: 0,
+        isMuted: false,
+        timerInterval: null,
+        secondsElapsed: 0,
+        ttsInterval: null
+    };
+
+    // ==========================================
+    // UI UTILITIES
+    // ==========================================
+    function showScreen(screenId) {
+        document.getElementById('screenSetup').classList.add('hidden');
+        document.getElementById('screenInterview').classList.add('hidden');
+        document.getElementById('screenReport').classList.add('hidden');
+        document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function selectCard(groupId, cardElement) {
+        const cards = document.getElementById(groupId).querySelectorAll('.selectable-card');
+        cards.forEach(c => c.classList.remove('selected', 'active'));
+        cardElement.classList.add('selected', 'active');
+        
+        const value = cardElement.getAttribute('data-value');
+        if (groupId === 'typeCards') document.getElementById('interviewType').value = value;
+        if (groupId === 'levelCards') document.getElementById('experienceLevel').value = value;
+    }
+
+    function formatTime(seconds) {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    function getColorClass(val, max=100) {
+        const pct = (val / max) * 100;
+        if (pct >= 70) return 'text-green';
+        if (pct >= 40) return 'text-orange';
+        return 'text-red';
+    }
+
+    function getBgColorClass(val, max=100) {
+        const pct = (val / max) * 100;
+        if (pct >= 70) return 'bg-green';
+        if (pct >= 40) return 'bg-orange';
+        return 'bg-red';
+    }
+
+    // ==========================================
+    // SETUP SCREEN LOGIC
+    // ==========================================
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('resumeFile');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            updateFileName();
+        }
+    });
+
+    fileInput.addEventListener('change', updateFileName);
+
+    function updateFileName() {
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            if (file.type !== "application/pdf") {
+                showToast("Please upload a PDF file", "error");
+                fileInput.value = "";
+                fileNameDisplay.classList.add("hidden");
+                return;
+            }
+            state.resumeFile = file;
+            fileNameDisplay.textContent = `Selected: ${file.name}`;
+            fileNameDisplay.classList.remove("hidden");
+        }
+    }
+
+    async function startSetup() {
+        if (!state.resumeFile) {
+            showToast("Please upload a resume first", "warning");
+            return;
+        }
+
+        const btn = document.getElementById('startBtn');
+        const btnText = document.getElementById('startBtnText');
+        
+        const jobRole = document.getElementById('jobRole').value;
+        const interviewType = document.getElementById('interviewType').value;
+        const experienceLevel = document.getElementById('experienceLevel').value;
+        state.apiKey = document.getElementById('apiKey').value;
+
+        try {
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="spinner"></span> Starting...';
+
+            const formData = new FormData();
+            formData.append('file', state.resumeFile);
+            formData.append('job_role', jobRole);
+            formData.append('interview_type', interviewType);
+            formData.append('experience_level', experienceLevel);
+
+            const headers = {};
+            if (state.apiKey) headers["X-API-Key"] = state.apiKey;
+
+            const res = await fetch(`${API_URL}/upload-resume`, {
+                method: 'POST',
+                headers: headers,
+                body: formData
+            });
+
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            state.sessionId = data.session_id;
+            
+            // Set up UI
+            document.getElementById('badgeRole').textContent = data.job_role || jobRole;
+            document.getElementById('badgeType').textContent = interviewType === 'full' ? 'Full' : 'Technical';
+            document.getElementById('badgeLevel').textContent = experienceLevel;
+            
+            showScreen('screenInterview');
+            startTimer();
+            initWebSocket();
+
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to start interview: " + err.message, "error");
+            btn.disabled = false;
+            btnText.textContent = "Start Interview";
+        }
+    }
+
+    // ==========================================
+    // INTERVIEW SCREEN LOGIC (WS + AUDIO)
+    // ==========================================
+
+    function startTimer() {
+        state.secondsElapsed = 0;
+        state.timerInterval = setInterval(() => {
+            state.secondsElapsed++;
+            document.getElementById('interviewTimer').textContent = formatTime(state.secondsElapsed);
+        }, 1000);
+    }
+
+    function initWebSocket() {
+        const wsUrl = `${WS_BASE}/ws/audio/${state.sessionId}?api_key=${encodeURIComponent(state.apiKey)}`;
+        state.ws = new WebSocket(wsUrl);
+
+        state.ws.onopen = () => {
+            console.log("WebSocket connected");
+        };
+
+        state.ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleWsMessage(data);
+            } catch (err) {
+                console.error("Failed to parse WS message", err);
+            }
+        };
+
+        state.ws.onerror = (err) => {
+            console.error("WebSocket error", err);
+            showToast("WebSocket error", "error");
+        };
+
+        state.ws.onclose = () => {
+            console.log("WebSocket closed");
+        };
+    }
+
+    function handleWsMessage(data) {
+        console.log("WS Recevied:", data);
+        
+        const type = data.type || data.event;
+
+        switch (type) {
+            case "question":
+                state.questionCount++;
+                document.getElementById('questionNumber').textContent = `Question ${state.questionCount}`;
+                document.getElementById('questionText').textContent = data.text || data.next_question;
+                document.getElementById('scoresPanel').classList.add('hidden');
+                document.getElementById('nextActionContainer').classList.add('hidden');
+                document.getElementById('liveTranscript').textContent = "";
+                document.getElementById('recordStartBtn').disabled = true; // Wait for AI
+                speakText(data.text || data.next_question);
+                break;
+
+            case "transcript":
+                if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+                document.getElementById('liveTranscript').textContent = data.text;
+                break;
+
+            case "evaluation":
+            case "result":
+                // Show scores
+                if (data.content_score !== undefined || data.evaluation) {
+                    const cScore = data.content_score ?? (data.evaluation?.final_score || 0);
+                    const fScore = data.fluency_score ?? 0;
+                    const aScore = data.avg_score ?? data.average_score ?? 0;
+
+                    const elContent = document.getElementById('scoreContent');
+                    elContent.textContent = `${cScore.toFixed(0)}%`;
+                    elContent.className = `score-card-value ${getColorClass(cScore)}`;
+
+                    const elFluency = document.getElementById('scoreFluency');
+                    elFluency.textContent = `${fScore.toFixed(0)}%`;
+                    elFluency.className = `score-card-value ${getColorClass(fScore)}`;
+
+                    const elAvg = document.getElementById('scoreAvg');
+                    elAvg.textContent = `${aScore.toFixed(0)}%`;
+                    elAvg.className = `score-card-value ${getColorClass(aScore)}`;
+
+                    document.getElementById('scoresPanel').classList.remove('hidden');
+                }
+                
+                if (data.next_question && !data.interview_complete) {
+                    document.getElementById('nextActionContainer').classList.remove('hidden');
+                }
+                break;
+
+            case "interview_complete":
+            case "final_report":
+                stopRecording();
+                clearInterval(state.timerInterval);
+                if (data.report) {
+                    renderReport(data.report);
+                } else if (state.sessionId) {
+                    fetchReport();
+                }
+                break;
+
+            case "invalid_answer":
+            case "interview_terminated":
+                stopRecording();
+                showModal(type === "invalid_answer" ? "Invalid Response" : "Interview Terminated", data.message || "Please provide a relevant answer.");
+                break;
+
+            case "warning":
+                showToast(data.message, "warning");
+                break;
+        }
+    }
+
+    // Modal
+    function showModal(title, message) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalMessage').textContent = message;
+        document.getElementById('alertModal').classList.add('active');
+    }
+    document.getElementById('modalBtn').addEventListener('click', () => {
+        document.getElementById('alertModal').classList.remove('active');
+    });
+
+
+    // TTS Logic
+    document.getElementById('toggleMuteBtn').addEventListener('click', (e) => {
+        state.isMuted = !state.isMuted;
+        e.target.textContent = state.isMuted ? "Unmute AI" : "Mute AI";
+        if (state.isMuted && window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            onAiSpeechEnd();
+        }
+    });
+
+    function speakText(text) {
+        if (state.isMuted || !window.speechSynthesis) {
+            onAiSpeechEnd();
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+        clearInterval(state.ttsInterval);
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        document.getElementById('aiStatus').classList.remove('hidden');
+        document.getElementById('recordStartBtn').disabled = true;
+
+        utterance.onend = () => {
+            clearInterval(state.ttsInterval);
+            onAiSpeechEnd();
+        };
+
+        utterance.onerror = () => {
+            clearInterval(state.ttsInterval);
+            onAiSpeechEnd();
+        };
+
+        window.speechSynthesis.speak(utterance);
+
+        // Chrome bug workaround
+        state.ttsInterval = setInterval(() => {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+            } else {
+                clearInterval(state.ttsInterval);
+            }
+        }, 10000);
+    }
+
+    function onAiSpeechEnd() {
+        document.getElementById('aiStatus').classList.add('hidden');
+        document.getElementById('recordStartBtn').disabled = false;
+    }
+
+
+    // Audio Capture Logic
+    const btnStartRecord = document.getElementById('recordStartBtn');
+    const btnStopRecord = document.getElementById('recordStopBtn');
+
+    btnStartRecord.addEventListener('click', startRecording);
+    btnStopRecord.addEventListener('click', stopRecording);
+    document.getElementById('nextQuestionBtn').addEventListener('click', () => {
+        document.getElementById('liveTranscript').textContent = "Your transcript will appear here as you speak...";
+        document.getElementById('scoresPanel').classList.add('hidden');
+        document.getElementById('nextActionContainer').classList.add('hidden');
+        // Let the backend push the next question, or if we received it, just wait. 
+        // Our current flow shows the next question inside the "question" message
+        // Actually, if we use REST fallback, we might trigger submit here. But we use WS.
+        // Wait, the backend already sent next_question in "result".
+        // Let's send a ping or continue message if needed.
+        // But backend sends question via WS immediately after result?
+        // Wait, looking at server.py: it sends evaluation, then question immediately.
+        // So the user doesn't need to click next! 
+        // Let's hide the button or just keep it as a UI placeholder that shouldn't appear if question auto-loads.
+    });
+
+    document.getElementById('endInterviewBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('endInterviewBtn');
+        btn.disabled = true;
+        btn.textContent = "Ending...";
+        
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify({ type: "end_interview" }));
+        } else {
+            // fallback REST
+            try {
+                const headers = {};
+                if (state.apiKey) headers["X-API-Key"] = state.apiKey;
+                const res = await fetch(`${API_URL}/end-interview/${state.sessionId}`, { method: 'POST', headers });
+                const json = await res.json();
+                if (json.report) renderReport(json.report);
+            } catch (err) {
+                console.error(err);
+                showToast("Failed to end interview", "error");
+            }
+            clearInterval(state.timerInterval);
+        }
+    });
+
+    async function startRecording() {
+        if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+
+        try {
+            state.audioStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { sampleRate: 16000, channelCount: 1 } 
+            });
+
+            state.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const source = state.audioContext.createMediaStreamSource(state.audioStream);
+            
+            // 512 frames = 32ms at 16kHz
+            state.audioProcessor = state.audioContext.createScriptProcessor(512, 1, 1);
+            
+            source.connect(state.audioProcessor);
+            state.audioProcessor.connect(state.audioContext.destination);
+
+            state.audioProcessor.onaudioprocess = (e) => {
+                if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+                
+                const float32Data = e.inputBuffer.getChannelData(0);
+                const int16Data = new Int16Array(float32Data.length);
+                
+                for (let i = 0; i < float32Data.length; i++) {
+                    let s = Math.max(-1, Math.min(1, float32Data[i]));
+                    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                
+                state.ws.send(int16Data.buffer);
+            };
+
+            btnStartRecord.classList.add('hidden');
+            btnStopRecord.classList.remove('hidden');
+            document.getElementById('audioStatus').classList.remove('hidden');
+
+        } catch (err) {
+            console.error("Audio access denied", err);
+            showToast("Microphone access is required.", "error");
+        }
+    }
+
+    function stopRecording() {
+        if (state.audioProcessor) {
+            state.audioProcessor.disconnect();
+            state.audioProcessor = null;
+        }
+        if (state.audioStream) {
+            state.audioStream.getTracks().forEach(t => t.stop());
+            state.audioStream = null;
+        }
+        if (state.audioContext) {
+            state.audioContext.close();
+            state.audioContext = null;
+        }
+
+        btnStartRecord.classList.remove('hidden');
+        btnStopRecord.classList.add('hidden');
+        document.getElementById('audioStatus').classList.add('hidden');
+
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify({ type: "end_of_speech", event: "end_of_speech" }));
+        }
+    }
+
+
+    // ==========================================
+    // REPORT SCREEN LOGIC
+    // ==========================================
+    
+    async function fetchReport() {
+        try {
+            const headers = {};
+            if (state.apiKey) headers["X-API-Key"] = state.apiKey;
+            const res = await fetch(`${API_URL}/get-report/${state.sessionId}`, { headers });
+            const data = await res.json();
+            renderReport(data);
+        } catch(e) {
+            showToast("Failed to fetch report", "error");
+        }
+    }
+
+    function renderReport(report) {
+        if (!report || !report.session_summary) {
+            showToast("Rendering report failed: missing data", "error");
+            return;
+        }
+        
+        showScreen('screenReport');
+
+        const summary = report.session_summary;
+        const oScore = summary.overall_score || 0;
+        
+        document.getElementById('reportSubtitle').textContent = 
+            `${summary.job_role || 'Candidate'} • ${summary.experience_level || 'Unknown'} • ${summary.interview_type || 'Interview'}`;
+        
+        const circle = document.getElementById('reportOverallCircle');
+        circle.style.setProperty('--value', oScore);
+        document.getElementById('reportOverallText').textContent = `${parseFloat(oScore).toFixed(0)}%`;
+        
+        const bandEl = document.getElementById('reportBand');
+        const bandStr = summary.performance_band || "Unknown";
+        bandEl.textContent = bandStr;
+        
+        if(bandStr.toLowerCase().includes('strong')) bandEl.className = "band-badge bg-green";
+        else if(bandStr.toLowerCase().includes('moderate')) bandEl.className = "band-badge bg-orange";
+        else bandEl.className = "band-badge bg-red";
+
+        // Bars
+        const cScore = report.content_scores?.average_content_score || 0;
+        const fScore = report.fluency_scores?.overall_fluency_score || 0;
+        
+        document.getElementById('reportScoreContentTxt').textContent = `${parseFloat(cScore).toFixed(0)}%`;
+        document.getElementById('reportScoreContentTxt').className = getColorClass(cScore);
+        const cFill = document.getElementById('reportScoreContentFill');
+        cFill.style.width = `${cScore}%`;
+        cFill.className = `bar-chart-fill ${getBgColorClass(cScore)}`;
+        
+        document.getElementById('reportScoreFluencyTxt').textContent = `${parseFloat(fScore).toFixed(0)}%`;
+        document.getElementById('reportScoreFluencyTxt').className = getColorClass(fScore);
+        const fFill = document.getElementById('reportScoreFluencyFill');
+        fFill.style.width = `${fScore}%`;
+        fFill.className = `bar-chart-fill ${getBgColorClass(fScore)}`;
+
+        // Stats
+        document.getElementById('reportWPM').textContent = parseInt(report.fluency_scores?.avg_speech_rate_wpm || 0);
+        document.getElementById('reportPauses').textContent = parseInt(report.fluency_scores?.avg_pause_count || 0);
+        document.getElementById('reportFillers').textContent = parseInt(report.fluency_scores?.avg_filler_words || 0);
+        document.getElementById('reportVocab').textContent = parseFloat(report.fluency_scores?.avg_lexical_diversity || 0).toFixed(2);
+
+        // Skills & Weaknesses
+        const skillsContainer = document.getElementById('reportSkills');
+        skillsContainer.innerHTML = (summary.skills_detected || []).map(s => `<span class="pill good">${s}</span>`).join('');
+        
+        const weakContainer = document.getElementById('reportWeaknesses');
+        weakContainer.innerHTML = (summary.weak_areas || []).map(w => `<span class="pill bad">${w}</span>`).join('');
+
+        // Feedback
+        const feedbackContainer = document.getElementById('reportFeedback');
+        feedbackContainer.innerHTML = (report.feedback || []).map(f => {
+            const isPos = f.toLowerCase().includes('good') || f.toLowerCase().includes('excellent') || f.toLowerCase().includes('strong');
+            return `<li class="${isPos ? 'positive' : 'improvement'}">${f}</li>`;
+        }).join('');
+
+        // QA Log
+        const qaContainer = document.getElementById('reportQALog');
+        qaContainer.innerHTML = (report.qa_log || []).map((qa, i) => `
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
+                    <span>Q${qa.question_number || (i+1)}: ${qa.question}</span>
+                    <span class="accordion-icon">▼</span>
+                </div>
+                <div class="accordion-content">
+                    ${qa.answer_preview || 'No answer provided'}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function downloadPDF() {
+        if (!state.sessionId) return;
+        const btn = document.getElementById('btnDownloadPdf');
+        btn.disabled = true;
+        btn.textContent = "Generating PDF...";
+        
+        try {
+            const headers = {};
+            if (state.apiKey) headers["X-API-Key"] = state.apiKey;
+            const res = await fetch(`${API_URL}/generate-pdf/${state.sessionId}`, { method: 'POST', headers });
+            
+            if(!res.ok) throw new Error("Failed to generate PDF");
+            
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Interview_Report_${state.sessionId.substring(0,8)}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch(e) {
+            showToast(e.message, "error");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Download PDF Report";
+        }
+    }
+
+    function resetApp() {
+        if (state.ws) { state.ws.close(); }
+        state = {
+            sessionId: null,
+            apiKey: state.apiKey,
+            ws: null,
+            resumeFile: null,
+            audioContext: null,
+            audioStream: null,
+            audioProcessor: null,
+            questionCount: 0,
+            isMuted: false,
+            timerInterval: null,
+            secondsElapsed: 0,
+            ttsInterval: null
+        };
+        
+        document.getElementById('setupForm').reset();
+        document.getElementById('fileNameDisplay').classList.add('hidden');
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtnText').textContent = "Start Interview";
+        document.getElementById('liveTranscript').textContent = "Your transcript will appear here as you speak...";
+        document.getElementById('scoresPanel').classList.add('hidden');
+        showScreen('screenSetup');
+    }
+
+</script>
+</body>
+</html>
